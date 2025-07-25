@@ -1,0 +1,107 @@
+{
+  "name": "immich-mcp",
+  "version": "0.1.0",
+  "description": "FastMCP 2.10 server for Immich photo management with AI-powered photo organization and search capabilities.",
+  "author": "sandraschi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sandraschi/immichmcp"
+  },
+  "prompts": {
+    "photo_management": [
+      "Organize my vacation photos from last summer into albums by location and events.",
+      "Find all photos of my dog playing in the park and create a highlight reel.",
+      "Show me all photos with blue skies and sunny weather from my hiking trips.",
+      "Create a timeline of my child's first year using monthly photo highlights.",
+      "Find all duplicate photos in my library and help me remove the lower quality ones.",
+      "Show me my best landscape photos based on composition and quality.",
+      "Find all photos with specific people in them from the past year.",
+      "Create a photo book of my top 100 travel photos from the last 5 years.",
+      "Find all photos with text in them (like signs or documents).",
+      "Show me photos with specific objects (e.g., mountains, beaches, food)."
+    ],
+    "ai_enhancement": [
+      "Enhance the colors and lighting in my sunset photos.",
+      "Remove red-eye from all my portrait photos.",
+      "Apply a vintage film filter to my street photography.",
+      "Upscale my old family photos to higher resolution.",
+      "Colorize my black and white photos.",
+      "Remove unwanted objects from the background of my photos.",
+      "Create a panorama from these overlapping landscape shots.",
+      "Generate a short video slideshow with music from these vacation photos.",
+      "Find and fix underexposed or overexposed photos.",
+      "Create a time-lapse sequence from these time-stamped photos."
+    ],
+    "search_queries": [
+      "Find photos taken in Vienna during Christmas time.",
+      "Show me all photos with multiple people smiling.",
+      "Find photos with specific color schemes (e.g., blue and white).",
+      "Show me photos taken at night with good lighting.",
+      "Find all photos with pets in them.",
+      "Show me photos from indoor events with good lighting.",
+      "Find photos with specific weather conditions (rain, snow, fog).",
+      "Show me photos taken at specific landmarks or locations.",
+      "Find photos with specific camera settings (e.g., long exposure).",
+      "Show me photos from specific months across different years."
+    ],
+    "organization": [
+      "Create albums based on the location data in my photos.",
+      "Group photos by events using date and time information.",
+      "Tag all photos with recognized faces automatically.",
+      "Create a folder structure by year and month for all my photos.",
+      "Find and organize all screenshots into a separate album.",
+      "Create smart albums for photos with specific criteria.",
+      "Group similar photos together for easier selection.",
+      "Create a 'Best of' collection for each year.",
+      "Organize photos by the dominant colors in them.",
+      "Create a map view of all my geotagged photos."
+    ],
+    "sharing": [
+      "Create a shared album of our family vacation for relatives.",
+      "Generate a PDF photo book of my best landscape photos.",
+      "Create a private online gallery for my portfolio.",
+      "Make a slideshow with music for the family reunion.",
+      "Share a selection of photos via a secure link that expires in 7 days.",
+      "Create a video montage of my child's first steps.",
+      "Generate social media ready versions of these photos.",
+      "Create a before/after comparison of edited photos.",
+      "Share a selection of photos with specific people tagged.",
+      "Create a shared workspace for collaborative photo editing."
+    ]
+  },
+  "config": {
+    "immich": {
+      "url": "http://localhost:2283",
+      "api_key": "your_immich_api_key_here"
+    },
+    "server": {
+      "host": "0.0.0.0",
+      "port": 8000,
+      "log_level": "info"
+    },
+    "features": {
+      "face_recognition": true,
+      "object_detection": true,
+      "scene_recognition": true,
+      "color_analysis": true,
+      "duplicate_detection": true
+    }
+  },
+  "dependencies": {
+    "python": ">=3.11.0",
+    "fastapi": ">=0.95.0",
+    "pydantic": ">=2.0.0",
+    "pydantic-settings": ">=2.0.0",
+    "httpx": ">=0.24.0",
+    "python-multipart": ">=0.0.6",
+    "uvicorn": ">=0.21.0"
+  },
+  "tags": ["photo-management", "ai", "computer-vision", "fastapi", "immich"],
+  "keywords": ["photo organization", "image recognition", "ai photo search", "photo backup", "digital asset management"],
+  "screenshots": [
+    "https://raw.githubusercontent.com/sandraschi/immichmcp/main/screenshots/dashboard.png",
+    "https://raw.githubusercontent.com/sandraschi/immichmcp/main/screenshots/search.png",
+    "https://raw.githubusercontent.com/sandraschi/immichmcp/main/screenshots/albums.png"
+  ]
+}
