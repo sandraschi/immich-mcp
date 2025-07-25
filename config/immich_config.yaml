@@ -1,0 +1,66 @@
+# Immich-specific configuration templates
+# Austrian dev efficiency: Pre-configured settings for common Immich setups
+
+# Development environment template
+development:
+  url: "http://localhost:2283"
+  api_key: "${IMMICH_API_KEY}"
+  features:
+    face_detection: true
+    smart_search: true
+    auto_tagging: false
+    bulk_operations: true
+  performance:
+    timeout: 30
+    max_retries: 3
+    concurrent_uploads: 3
+
+# Production environment template  
+production:
+  url: "${IMMICH_URL}"
+  api_key: "${IMMICH_API_KEY}"
+  features:
+    face_detection: true
+    smart_search: true
+    auto_tagging: true
+    bulk_operations: true
+  performance:
+    timeout: 60
+    max_retries: 5
+    concurrent_uploads: 5
+  security:
+    verify_ssl: true
+    timeout_extensions: false
+
+# Docker environment template
+docker:
+  url: "http://immich-server:3001"
+  api_key: "${IMMICH_API_KEY}"
+  features:
+    face_detection: true
+    smart_search: true
+    auto_tagging: true
+    bulk_operations: true
+  performance:
+    timeout: 45
+    max_retries: 3
+    concurrent_uploads: 4
+
+# Vienna-specific deployment (Austrian context)
+vienna_deployment:
+  url: "${IMMICH_URL}"
+  api_key: "${IMMICH_API_KEY}"
+  features:
+    face_detection: true
+    smart_search: true
+    auto_tagging: true
+    bulk_operations: true
+  localization:
+    timezone: "Europe/Vienna"
+    date_format: "DD.MM.YYYY"
+    language: "de"
+  performance:
+    timeout: 30
+    max_retries: 3
+    concurrent_uploads: 5
+    optimize_for_europe: true

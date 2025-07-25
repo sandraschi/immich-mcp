@@ -1,0 +1,154 @@
+# Immich MCP Server - Git Ignore Rules
+# Austrian efficiency: Comprehensive exclusions
+
+# Environment and secrets
+.env
+.env.local
+.env.production
+*.key
+*.pem
+api_keys.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+.nox/
+htmlcov/
+.coverage.*
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Logs
+*.log
+logs/
+log/
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+temp/
+tmp/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache directories
+.cache/
+.mypy_cache/
+.ruff_cache/
+
+# Documentation builds
+docs/_build/
+docs/build/
+site/
+
+# Test outputs
+test_outputs/
+test_data/
+test_images/
+test_uploads/
+
+# FastMCP specific
+server_state.json
+mcp_cache/
+
+# Austrian context
+vienna_photos_test/
+wiener_test_data/
+
+# Package managers
+.npm
+node_modules/
+package-lock.json
+yarn.lock
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+desktop.ini
+$RECYCLE.BIN/
+
+# Archive files
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.tar.bz2
+
+# Large media files (should be in Immich, not repo)
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.jpg
+*.jpeg
+*.png
+*.tiff
+*.webp
+*.heic
+*.raw
+
+# Backup files
+*~
+*.orig
+*.rej

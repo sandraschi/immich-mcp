@@ -1,0 +1,53 @@
+# Immich MCP Server Configuration
+# FastMCP 2.0 compliant settings for Austrian dev efficiency
+
+server:
+  name: "Immich Photo Management MCP 📸"
+  version: "1.0.0"
+  description: "Comprehensive Immich photo library management through MCP protocol"
+  
+  # Performance settings
+  timeout: 30
+  max_retries: 3
+  concurrent_uploads: 5
+  
+  # Logging configuration
+  log_level: "INFO"
+  log_format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Immich connection settings
+immich:
+  # Default connection (override with environment variables)
+  default_url: "http://localhost:2283"
+  api_timeout: 30
+  
+  # Feature flags
+  features:
+    face_detection: true
+    smart_search: true
+    auto_tagging: true
+    bulk_operations: true
+    
+  # Upload settings
+  upload:
+    max_file_size_mb: 500
+    supported_formats:
+      images: [".jpg", ".jpeg", ".png", ".tiff", ".webp", ".heic"]
+      videos: [".mp4", ".mov", ".avi", ".mkv"]
+    preserve_metadata: true
+    auto_organize: false
+
+# Austrian efficiency settings
+efficiency:
+  # Direct communication preferences
+  verbose_errors: true
+  detailed_responses: true
+  
+  # Performance optimizations
+  cache_duration: 300
+  batch_size: 50
+  parallel_processing: true
+  
+  # Budget awareness
+  optimize_bandwidth: true
+  compress_responses: false
