@@ -1,14 +1,17 @@
-# Immich MCP Server 📸
+# Immich MCP Server 
 
-**FastMCP 2.0 Implementation** | **Austrian Dev Efficiency** | **Complete Photo Management**
+**FastMCP 2.10 Implementation** | **Austrian Dev Efficiency** | **Complete Photo Management**
 
 Comprehensive Immich photo library management through the MCP (Model Context Protocol). Built with Austrian efficiency principles: working solutions in hours, not days.
 
-## 🚀 Quick Start (5 Minutes)
+> **Note**: This project is currently being migrated to FastMCP 2.10. Some features may be in transition.
+
+## Quick Start (5 Minutes)
 
 ### 1. Prerequisites
 
-- Python 3.8+
+- Python 3.11+
+- [Poetry](https://python-poetry.org/) for dependency management
 - [Immich server](https://immich.app/) running and accessible
 - Immich API key (get from Web UI → User Settings → API Keys)
 
@@ -16,33 +19,43 @@ Comprehensive Immich photo library management through the MCP (Model Context Pro
 
 ```bash
 # Clone repository
-git clone <repository-url>
+git clone https://github.com/sandraschi/immichmcp.git
 cd immichmcp
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies using Poetry
+poetry install
 
-# Configure environment
+# Copy and configure environment
 cp .env.example .env
 # Edit .env with your Immich URL and API key
 ```
 
 ### 3. Configuration
 
-Edit `.env` file:
+Edit `.env` file with your Immich server details:
 
 ```bash
-IMMICH_URL=http://localhost:2283
-IMMICH_API_KEY=your_api_key_here
+# Required
+IMMICH_MCP_IMMICH_API_KEY=your_api_key_here
+IMMICH_MCP_IMMICH_URL=http://localhost:2283
+
+# Optional: Server settings
+IMMICH_MCP_HOST=0.0.0.0
+IMMICH_MCP_PORT=8000
+IMMICH_MCP_LOG_LEVEL=info
 ```
 
 ### 4. Run Server
 
 ```bash
-python server.py
+# Using Poetry (recommended)
+poetry run python -m immich_mcp.server
+
+# Or with direct Python
+python -m immich_mcp.server
 ```
 
-Look for: `✅ Immich MCP Server ready!`
+Look for: `INFO:     Uvicorn running on http://0.0.0.0:8000`
 
 ## 📸 What It Does
 
