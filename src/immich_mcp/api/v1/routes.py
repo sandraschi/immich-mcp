@@ -6,7 +6,7 @@ This module defines the FastAPI router with all v1 API endpoints.
 from fastapi import APIRouter, Depends, HTTPException
 from fastmcp import FastMCP
 
-from ...config import get_settings
+from ...config import get_config
 from ...immich_api import ImmichAPIClient
 
 router = APIRouter(prefix="/api/v1", tags=["v1"])

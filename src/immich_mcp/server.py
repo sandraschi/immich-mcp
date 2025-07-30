@@ -7,21 +7,33 @@ Provides 15 tools: 5 core photo operations + 4 album management + 3 people/faces
 
 import asyncio
 import os
+import sys
 import logging
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent.parent / '.env'
+load_dotenv(env_path)
+
+# Add the src directory to Python path so imports work when run directly
+src_dir = Path(__file__).parent.parent
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
 from typing import Optional, List, Dict, Any, Type, Callable
 from datetime import datetime
 from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, Depends
-from fastmcp import FastMCP, FastMCPBase, FastMCPConfig
+from fastmcp import FastMCP
 from pydantic import BaseModel, Field, AnyHttpUrl
 from rich.console import Console
 from dotenv import load_dotenv
 
-from .immich_api import ImmichAPIClient, ImmichAPIError
-from .config import ImmichConfig, get_settings
-from .api.v1.routes import router as v1_router
+from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError
+from immich_mcp.config import ImmichConfig, get_config
+from immich_mcp.api.v1.routes import router as v1_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,20 +42,26 @@ logger = logging.getLogger("immich_mcp")
 # Initialize console for rich output
 console = Console()
 
-class ImmichMCP(FastMCPBase):
+class ImmichMCP(FastMCP):
     """ImmichMCP server implementation extending FastMCP 2.10 base."""
     
-    def __init__(self, config: Optional[FastMCPConfig] = None):
+    def __init__(self, **kwargs):
         """Initialize the ImmichMCP server.
         
         Args:
-            config: Optional FastMCP configuration
+            **kwargs: Additional arguments to pass to FastMCP
         """
-        super().__init__(config or FastMCPConfig(
-            name="ImmichMCP",
-            version="1.0.0",
-            description="FastMCP 2.10 server for Immich photo management",
-        ))
+        # Set default values if not provided
+        kwargs.setdefault('name', 'ImmichMCP')
+        kwargs.setdefault('version', '1.0.0')
+        kwargs.setdefault('log_level', 'INFO')
+        
+        # Initialize FastMCP with only the parameters it accepts
+        super().__init__(
+            name=kwargs['name'],
+            version=kwargs['version'],
+            log_level=kwargs['log_level']
+        )
         self.immich_client: Optional[ImmichAPIClient] = None
         self.app = FastAPI(
             title="ImmichMCP",
@@ -60,13 +78,10 @@ class ImmichMCP(FastMCPBase):
     
     async def startup_event(self):
         """Initialize resources when the server starts."""
-        settings = get_settings()
         try:
-            self.immich_client = ImmichAPIClient(
-                base_url=settings.immich_url,
-                api_key=settings.immich_api_key,
-            )
-            await self.immich_client.initialize()
+            # Get the config and initialize the Immich client
+            config = get_config()
+            self.immich_client = ImmichAPIClient(config=config)
             logger.info("Immich client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Immich client: {e}")
@@ -89,6 +104,13 @@ class ImmichMCP(FastMCPBase):
 # Initialize FastMCP server
 mcp = ImmichMCP()
 
+# Expose the FastAPI app for Uvicorn
+app = mcp.app
+
+# Main entry point
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("src.immich_mcp.server:app", host="0.0.0.0", port=8077, reload=True)
 
 # Pydantic Models for all 15 tools
 class PhotoSearchResult(BaseModel):

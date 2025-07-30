@@ -7,7 +7,7 @@ import os
 import httpx
 from typing import Dict, Any, List, Optional
 from pathlib import Path
-from .config import ImmichConfig
+from immich_mcp.config import ImmichConfig
 
 
 class ImmichAPIError(Exception):

@@ -1,6 +1,6 @@
 {
   "name": "immich-mcp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "FastMCP 2.10 server for Immich photo management with AI-powered photo organization and search capabilities.",
   "author": "sandraschi",
   "license": "MIT",
