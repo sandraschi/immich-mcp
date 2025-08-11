@@ -1,15 +1,18 @@
 # Immich MCP Server Dependencies
-# FastMCP 2.0+ with latest MCP spec compliance
+# Using latest FastMCP with pydantic 2.x
 fastmcp>=2.10.0
 
 # Core dependencies
-requests>=2.31.0       # HTTP client for Immich API
-python-dotenv>=1.0.0   # Environment management
+httpx>=0.25.0         # Async HTTP client for Immich API
+python-dotenv>=1.0.0  # Environment management
+pydantic>=2.0.0       # Data validation and settings management
+typing-extensions>=4.0.0  # Required for Annotated type hints
 
-# Development and testing
+# Development and testing (optional)
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
 black>=23.0.0
+mypy>=1.0.0
 
-# Optional: Enhanced output
-rich>=13.0.0           # Better console output
+# Enhanced output (optional)
+rich>=13.0.0          # Better console output

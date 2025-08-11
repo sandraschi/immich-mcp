@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "immich-mcp",
   "version": "1.0.0",
-  "description": "Austrian efficiency for Immich photo management - 15 comprehensive tools for Sandra's 2000+ photo library with CLIP smart search, face detection, and automated organization. FastMCP 2.10 server with zero decision paralysis.",
+  "description": "Austrian efficiency for Immich photo management with FastMCP 2.11+",
   "author": {
     "name": "sandraschi",
     "email": "sandra@example.com"
@@ -10,123 +10,42 @@
   "keywords": [
     "immich", "photo", "photos", "pictures", "images", "gallery", "library",
     "photo-management", "image-organization", "photo-storage", "media-server",
-    "smart-search", "clip-search", "ai-search", "face-detection", "people-tagging",
-    "album-management", "photo-organization", "metadata", "exif", "geolocation",
-    "austrian-efficiency", "decision-paralysis", "batch-processing", "automated-organization",
-    "zero-config", "intelligent-defaults", "workflow-optimization",
-    "fastmcp", "mcp-server", "self-hosted", "open-source", "backup", "export",
-    "duplicate-detection", "storage-management", "performance-optimization",
-    "family-photos", "pet-photos", "travel-photos", "event-organization",
-    "photo-backup", "photo-sharing", "photo-archival", "memory-preservation",
-    "claude-desktop", "ai-assistant", "photo-ai", "intelligent-photo-management"
+    "fastmcp", "mcp-server", "self-hosted", "open-source", "claude-desktop"
   ],
   "server": {
     "type": "python",
-    "entry_point": "src/immich_mcp/server.py",
+    "entry_point": "immich_mcp_server.py",
     "mcp_config": {
       "command": "python",
-      "args": ["-m", "src.immich_mcp.server"],
-      "env": {
-        "IMMICH_URL": "${user_config.immich_server_url}",
-        "IMMICH_API_KEY": "${user_config.immich_api_key}",
-        "DEFAULT_ORGANIZATION": "${user_config.default_organization_type}",
-        "BACKUP_QUALITY": "${user_config.backup_quality}",
-        "SMART_SEARCH_ENABLED": "${user_config.smart_search_enabled}",
-        "FACE_DETECTION_ENABLED": "${user_config.face_detection_enabled}",
-        "AUTO_BACKUP_ENABLED": "${user_config.auto_backup_enabled}"
-      }
+      "args": ["immich_mcp_server.py"]
     }
   },
   "tools": [
-    {"name": "upload_photos", "description": "Batch upload photos with metadata detection and duplicate handling"},
-    {"name": "search_photos", "description": "CLIP smart search with natural language queries plus metadata search"},
-    {"name": "get_photo_info", "description": "Complete photo metadata including EXIF, people, and album associations"},
-    {"name": "organize_photos_by_date", "description": "Austrian efficiency date-based photo organization with bulk album creation"},
-    {"name": "delete_photos", "description": "Safe photo deletion with trash recovery option"},
-    {"name": "create_album", "description": "Create new photo albums with initial photo selection"},
-    {"name": "add_to_album", "description": "Add photos to existing albums with duplicate detection"},
-    {"name": "list_albums", "description": "List all albums with comprehensive metadata and statistics"},
-    {"name": "share_album", "description": "Generate public share links with permission controls"},
-    {"name": "detect_people", "description": "AI-powered face detection and clustering for people identification"},
-    {"name": "tag_person", "description": "Assign names to detected faces and merge face clusters"},
-    {"name": "search_by_person", "description": "Find all photos containing specific people by name"},
-    {"name": "get_storage_info", "description": "Storage usage statistics and performance metrics"},
-    {"name": "backup_photos", "description": "Export photos with metadata preservation and album structure"},
-    {"name": "server_health", "description": "Immich server health diagnostics and connection testing"}
-  ],
-  "prompts": [
     {
-      "name": "organize_my_photos",
-      "description": "Austrian efficiency photo organization with zero decision paralysis",
-      "text": "Organize my photo library using Austrian efficiency principles. Analyze my 2000+ photos, detect duplicates, create date-based albums, and eliminate organizational chaos. Provide specific action plan with priority levels - tell me exactly what to do first!"
+      "name": "upload_photos",
+      "description": "Upload photos to Immich with batch processing and metadata detection"
     },
     {
-      "name": "find_photos_of_benny",
-      "description": "Smart search for Sandra's beautiful GSD dog Benny",
-      "text": "Find all photos of Benny (my beautiful German Shepherd Dog) using CLIP smart search and face detection. Look for golden fur, alert ears, and playful expressions. Group by activities: park play, home relaxation, walks, and training sessions."
+      "name": "get_photo_info",
+      "description": "Get detailed information about a photo including metadata"
     },
     {
-      "name": "backup_strategy_analyzer",
-      "description": "Comprehensive backup planning for photo preservation",
-      "text": "Analyze my photo library and create Austrian efficiency backup strategy. Calculate storage requirements, identify critical photos, suggest backup schedules, and provide disaster recovery plan for my 2000+ photo collection."
-    },
-    {
-      "name": "memory_lane_generator",
-      "description": "AI-powered photo memory and timeline creation",
-      "text": "Create nostalgic photo timelines and memory collections. Find photos from specific time periods, identify significant events, group by people and locations. Generate 'year in review' collections with Austrian storytelling efficiency."
-    },
-    {
-      "name": "photo_health_checkup",
-      "description": "Complete photo library maintenance and optimization",
-      "text": "Perform comprehensive health analysis of my Immich photo library. Detect corrupted files, missing metadata, duplicate photos, storage inefficiencies. Provide Austrian efficiency cleanup recommendations with specific action items."
+      "name": "server_health",
+      "description": "Check the health and status of the Immich server"
     }
   ],
   "user_config": {
-    "immich_server_url": {
+    "immich_url": {
       "type": "string",
       "title": "Immich Server URL",
-      "description": "Immich server URL (e.g., http://localhost:2283)",
-      "default": "http://localhost:2283",
-      "required": true
+      "required": true,
+      "default": "http://localhost:2283"
     },
     "immich_api_key": {
       "type": "string",
       "title": "Immich API Key",
-      "description": "Immich API key for authentication",
-      "sensitive": true,
-      "required": true
-    },
-    "default_organization_type": {
-      "type": "select",
-      "title": "Default Organization Type",
-      "description": "Default photo organization method",
-      "options": ["year", "year_month", "year_month_day"],
-      "default": "year_month"
-    },
-    "backup_quality": {
-      "type": "select",
-      "title": "Backup Quality",
-      "description": "Backup quality and compression",
-      "options": ["original", "high", "medium", "optimized"],
-      "default": "original"
-    },
-    "smart_search_enabled": {
-      "type": "boolean",
-      "title": "Smart Search Enabled",
-      "description": "Enable CLIP-based smart search for natural language queries",
-      "default": true
-    },
-    "face_detection_enabled": {
-      "type": "boolean",
-      "title": "Face Detection Enabled",
-      "description": "Enable automatic face detection and people tagging",
-      "default": true
-    },
-    "auto_backup_enabled": {
-      "type": "boolean",
-      "title": "Auto Backup Enabled",
-      "description": "Enable automatic periodic backups",
-      "default": false
+      "required": true,
+      "sensitive": true
     }
   }
 }
