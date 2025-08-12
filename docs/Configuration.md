@@ -204,6 +204,7 @@ IMMICH_API_KEY = "your_key_here"  # DON'T DO THIS
 ### Connection Issues
 
 1. **Check Immich URL format:**
+
    ```bash
    # Correct
    IMMICH_URL=http://localhost:2283
@@ -213,11 +214,13 @@ IMMICH_API_KEY = "your_key_here"  # DON'T DO THIS
    ```
 
 2. **Verify API key validity:**
+
    ```bash
    curl -H "x-api-key: YOUR_KEY" http://localhost:2283/api/server-info
    ```
 
 3. **Test server availability:**
+
    ```bash
    curl http://localhost:2283/api/server-info
    ```
@@ -225,18 +228,21 @@ IMMICH_API_KEY = "your_key_here"  # DON'T DO THIS
 ### Performance Issues
 
 1. **Reduce concurrent uploads:**
+
    ```yaml
    server:
      concurrent_uploads: 2  # Lower for slower servers
    ```
 
 2. **Increase timeouts:**
+
    ```yaml
    immich:
      api_timeout: 60  # For slower connections
    ```
 
 3. **Enable bandwidth optimization:**
+
    ```yaml
    efficiency:
      optimize_bandwidth: true
@@ -256,11 +262,13 @@ IMMICH_API_KEY = "your_key_here"  # DON'T DO THIS
 ### From FastMCP 1.x
 
 1. Update `requirements.txt`:
+
    ```
    fastmcp>=2.10.0
    ```
 
 2. Add new config files:
+
    ```bash
    cp config/settings.yaml.example config/settings.yaml
    ```
@@ -271,9 +279,11 @@ IMMICH_API_KEY = "your_key_here"  # DON'T DO THIS
 
 1. Export your current settings to `.env`
 2. Run configuration validator:
+
    ```bash
    python -c "from immich.manager import ImmichManager; print('✅ Config valid')"
    ```
+
 3. Test all tools work as expected
 
 **Austrian efficiency note**: Migration should take 15 minutes maximum. If it takes longer, something is wrong with the documentation (not you).

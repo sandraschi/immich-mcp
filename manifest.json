@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "immich-mcp",
   "version": "1.0.0",
-  "description": "Austrian efficiency for Immich photo management with FastMCP 2.11+",
+  "description": "Austrian efficiency for Immich photo management with FastMCP 2.11+ and GIMP integration. Search photos with natural language like 'dog at the beach at sunset' and edit with GIMP.",
   "author": {
     "name": "sandraschi",
     "email": "sandra@example.com"
@@ -10,7 +10,8 @@
   "keywords": [
     "immich", "photo", "photos", "pictures", "images", "gallery", "library",
     "photo-management", "image-organization", "photo-storage", "media-server",
-    "fastmcp", "mcp-server", "self-hosted", "open-source", "claude-desktop"
+    "fastmcp", "mcp-server", "self-hosted", "open-source", "claude-desktop",
+    "gimp", "photo-editing", "semantic-search", "ai-search", "clip-embeddings"
   ],
   "server": {
     "type": "python",
@@ -30,22 +31,48 @@
       "description": "Get detailed information about a photo including metadata"
     },
     {
+      "name": "search_photos",
+      "description": "Search photos using natural language queries (e.g., 'dog at the beach at sunset')"
+    },
+    {
       "name": "server_health",
       "description": "Check the health and status of the Immich server"
+    },
+    {
+      "name": "process_photos_batch",
+      "description": "Process multiple photos with GIMP for batch editing"
+    },
+    {
+      "name": "edit_photo_with_gimp",
+      "description": "Edit a photo using GIMP with specified operations"
     }
   ],
   "user_config": {
     "immich_url": {
       "type": "string",
       "title": "Immich Server URL",
+      "description": "The base URL of your Immich server (e.g., http://localhost:2283 or https://immich.example.com)",
       "required": true,
       "default": "http://localhost:2283"
     },
     "immich_api_key": {
       "type": "string",
       "title": "Immich API Key",
+      "description": "Your Immich API key (found in Immich settings under 'Account')",
       "required": true,
       "sensitive": true
+    },
+    "gimp_path": {
+      "type": "string",
+      "title": "GIMP Executable Path",
+      "description": "Path to GIMP executable (e.g., /usr/bin/gimp or C:\\Program Files\\GIMP 2\\bin\\gimp-2.10.exe)",
+      "required": false
+    },
+    "log_level": {
+      "type": "string",
+      "title": "Logging Level",
+      "description": "Logging verbosity level (debug, info, warning, error, critical)",
+      "default": "info"
     }
   }
 }

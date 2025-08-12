@@ -1,7 +1,7 @@
 {
   "name": "immich-mcp",
   "version": "1.0.0",
-  "description": "FastMCP 2.10 server for Immich photo management with AI-powered photo organization and search capabilities.",
+  "description": "FastMCP 2.10+ server for Immich photo management with AI-powered search and GIMP integration. Search your photos using natural language like 'dog at the beach at sunset' and edit them with GIMP.",
   "author": "sandraschi",
   "license": "MIT",
   "repository": {
@@ -115,22 +115,34 @@
       "Create a shared workspace for collaborative photo editing."
     ]
   },
-  "config": {
-    "immich": {
-      "url": "http://localhost:2283",
-      "api_key": "your_immich_api_key_here"
+  "user_config": {
+    "immich_url": {
+      "type": "string",
+      "default": "http://localhost:2283",
+      "description": "The base URL of your Immich server (e.g., http://localhost:2283 or https://immich.example.com)",
+      "required": true
     },
-    "server": {
-      "host": "0.0.0.0",
-      "port": 8000,
-      "log_level": "info"
+    "immich_api_key": {
+      "type": "string",
+      "description": "Your Immich API key (found in Immich settings under 'Account')",
+      "required": true,
+      "sensitive": true
     },
-    "features": {
-      "face_recognition": true,
-      "object_detection": true,
-      "scene_recognition": true,
-      "color_analysis": true,
-      "duplicate_detection": true
+    "server_host": {
+      "type": "string",
+      "default": "0.0.0.0",
+      "description": "Host address to run the MCP server on"
+    },
+    "server_port": {
+      "type": "number",
+      "default": 8000,
+      "description": "Port to run the MCP server on"
+    },
+    "log_level": {
+      "type": "string",
+      "default": "info",
+      "enum": ["debug", "info", "warning", "error", "critical"],
+      "description": "Logging level for the MCP server"
     }
   },
   "dependencies": {

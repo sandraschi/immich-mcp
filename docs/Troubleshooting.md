@@ -21,11 +21,13 @@ print('✅ Connection successful' if manager.test_connection() else '❌ Connect
 ### 2. Check Server Health
 
 Use the MCP tool:
+
 ```
 Check if Immich server is responding properly
 ```
 
 Expected response:
+
 ```json
 {
   "status": "healthy",
@@ -41,6 +43,7 @@ Expected response:
 #### ❌ `Connection refused` / `Connection timeout`
 
 **Symptoms:**
+
 - Cannot connect to Immich server
 - Timeout errors on all operations
 - "Connection refused" messages
@@ -48,12 +51,15 @@ Expected response:
 **Austrian diagnosis:** Your Immich server isn't running or accessible.
 
 **Solutions:**
+
 1. **Check Immich server status:**
+
    ```bash
    curl http://localhost:2283/api/server-info
    ```
 
 2. **Verify URL format:**
+
    ```bash
    # Correct
    IMMICH_URL=http://localhost:2283
@@ -64,6 +70,7 @@ Expected response:
    ```
 
 3. **Check Docker/service status:**
+
    ```bash
    docker ps | grep immich
    # or
@@ -73,6 +80,7 @@ Expected response:
 #### ❌ `Unauthorized` / `Invalid API key`
 
 **Symptoms:**
+
 - 401 Unauthorized errors
 - "Invalid API key" responses
 - Authentication failures
@@ -80,18 +88,21 @@ Expected response:
 **Austrian diagnosis:** Your API key is wrong, expired, or missing.
 
 **Solutions:**
+
 1. **Regenerate API key in Immich:**
    - Web UI → User Settings → API Keys
    - Delete old key, create new one
    - Update `.env` file
 
 2. **Verify key format:**
+
    ```bash
    # API keys are typically 40+ characters
    echo $IMMICH_API_KEY | wc -c
    ```
 
 3. **Test key manually:**
+
    ```bash
    curl -H "x-api-key: YOUR_KEY" http://localhost:2283/api/server-info
    ```
@@ -101,6 +112,7 @@ Expected response:
 #### ❌ `File upload failed` / `413 Request Entity Too Large`
 
 **Symptoms:**
+
 - Large files fail to upload
 - 413 HTTP status codes
 - "File too large" errors
@@ -108,12 +120,15 @@ Expected response:
 **Austrian diagnosis:** File exceeds size limits (server or MCP).
 
 **Solutions:**
+
 1. **Check file size:**
+
    ```bash
    ls -lh /path/to/your/file.jpg
    ```
 
 2. **Adjust MCP limits in `config/settings.yaml`:**
+
    ```yaml
    immich:
      upload:
@@ -127,13 +142,16 @@ Expected response:
 #### ❌ `Unsupported file format`
 
 **Symptoms:**
+
 - Specific file types rejected
 - "Format not supported" errors
 
 **Austrian diagnosis:** File type not in allowed list.
 
 **Solutions:**
+
 1. **Check supported formats in `config/settings.yaml`:**
+
    ```yaml
    immich:
      upload:
@@ -143,6 +161,7 @@ Expected response:
    ```
 
 2. **Convert unsupported files:**
+
    ```bash
    # Example: Convert HEIC to JPEG
    magick convert photo.heic photo.jpg
@@ -153,6 +172,7 @@ Expected response:
 #### ❌ `Smart search not working` / `No CLIP results`
 
 **Symptoms:**
+
 - Search returns no results
 - CLIP model errors
 - "Search feature unavailable"
@@ -160,12 +180,15 @@ Expected response:
 **Austrian diagnosis:** Immich's ML features aren't configured properly.
 
 **Solutions:**
+
 1. **Check Immich ML container:**
+
    ```bash
    docker logs immich_machine_learning
    ```
 
 2. **Verify search is enabled:**
+
    ```yaml
    immich:
      features:
@@ -179,6 +202,7 @@ Expected response:
 #### ❌ `Face detection failed`
 
 **Symptoms:**
+
 - No faces detected in photos
 - Face detection errors
 - People search returns empty
@@ -186,7 +210,9 @@ Expected response:
 **Austrian diagnosis:** Face detection model not loaded or configured.
 
 **Solutions:**
+
 1. **Enable face detection:**
+
    ```yaml
    immich:
      features:
@@ -194,11 +220,13 @@ Expected response:
    ```
 
 2. **Check ML container logs:**
+
    ```bash
    docker logs immich_machine_learning | grep face
    ```
 
 3. **Manually trigger face detection:**
+
    ```
    Run face detection on all my new photos
    ```
@@ -208,6 +236,7 @@ Expected response:
 #### ❌ `Slow responses` / `Operations timing out`
 
 **Symptoms:**
+
 - Long wait times for operations
 - Timeout errors after delays
 - Sluggish photo browsing
@@ -215,7 +244,9 @@ Expected response:
 **Austrian diagnosis:** Server overloaded or inefficient settings.
 
 **Solutions:**
+
 1. **Reduce concurrent operations:**
+
    ```yaml
    server:
      concurrent_uploads: 2  # Lower value
@@ -223,6 +254,7 @@ Expected response:
    ```
 
 2. **Enable bandwidth optimization:**
+
    ```yaml
    efficiency:
      optimize_bandwidth: true
@@ -231,6 +263,7 @@ Expected response:
    ```
 
 3. **Check server resources:**
+
    ```bash
    # CPU and memory usage
    top
@@ -243,6 +276,7 @@ Expected response:
 #### ❌ `Album creation failed`
 
 **Symptoms:**
+
 - Cannot create new albums
 - Album operations fail
 - "Insufficient permissions" errors
@@ -250,16 +284,19 @@ Expected response:
 **Austrian diagnosis:** User permissions or Immich configuration issue.
 
 **Solutions:**
+
 1. **Check user permissions in Immich:**
    - Ensure user can create albums
    - Verify not in read-only mode
 
 2. **Test album creation manually:**
+
    ```
    Create album "Test Album" 
    ```
 
 3. **Check Immich logs:**
+
    ```bash
    docker logs immich_server | grep album
    ```
@@ -269,6 +306,7 @@ Expected response:
 ### Enable Debug Logging
 
 In `.env`:
+
 ```bash
 LOG_LEVEL=DEBUG
 ```
@@ -310,6 +348,7 @@ with open('config/settings.yaml') as f:
 If using Austrian/European servers:
 
 1. **Timezone settings:**
+
    ```yaml
    vienna_deployment:
      timezone: "Europe/Vienna"
@@ -325,6 +364,7 @@ If using Austrian/European servers:
 Optimizations for ~€100/month AI tools usage:
 
 1. **Reduce API calls:**
+
    ```yaml
    efficiency:
      cache_duration: 900    # 15-minute cache
@@ -332,6 +372,7 @@ Optimizations for ~€100/month AI tools usage:
    ```
 
 2. **Bandwidth optimization:**
+
    ```yaml
    efficiency:
      optimize_bandwidth: true
@@ -341,11 +382,13 @@ Optimizations for ~€100/month AI tools usage:
 ## When to Report Issues
 
 **Report bugs if:**
+
 - Solutions above don't work after 15 minutes
 - Error messages are unclear or misleading
 - Performance is worse than expected
 
 **Don't report if:**
+
 - You didn't read this troubleshooting guide first
 - Your Immich server itself isn't working
 - Issue is clearly stated with solution above
@@ -357,11 +400,13 @@ Optimizations for ~€100/month AI tools usage:
 If everything is broken:
 
 1. **Stop server:**
+
    ```bash
    pkill -f "python server.py"
    ```
 
 2. **Reset configuration:**
+
    ```bash
    cp config/settings.yaml.example config/settings.yaml
    cp .env.example .env
@@ -370,11 +415,13 @@ If everything is broken:
 3. **Edit `.env` with correct values**
 
 4. **Test connection:**
+
    ```bash
    python -c "from immich.manager import ImmichManager; print('✅ Works')"
    ```
 
 5. **Restart server:**
+
    ```bash
    python server.py
    ```
