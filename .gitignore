@@ -152,3 +152,6 @@ $RECYCLE.BIN/
 *~
 *.orig
 *.rej
+
+# Private documentation (internal dev notes, not for public)
+docs-private/

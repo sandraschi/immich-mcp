@@ -1,6 +1,6 @@
 # Immich MCP Server Dependencies
 # Using latest FastMCP with pydantic 2.x
-fastmcp>=2.10.0
+fastmcp>=2.10.1
 
 # Core dependencies
 httpx>=0.25.0         # Async HTTP client for Immich API

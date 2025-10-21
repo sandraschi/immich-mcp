@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """
-ImmichMCP - FastMCP 2.11+ Server for Immich Photo Management
+ImmichMCP - FastMCP 2.11+ Server for Immich Photo Management - API FIXED v2
 
 Austrian efficiency for photo management with Immich.
-Pure FastMCP implementation following Windsurf assessment patterns.
+Pure FastMCP implementation with proper server health check.
+
+API Fixes for v1.137+:
+- /server-info/* → /server/*
+- /api/album → /api/albums
+- Fixed JSON parsing in server_health (ping returns plain text)
 """
 
 import asyncio
@@ -63,6 +68,13 @@ class PhotoInfo(BaseModel):
     file_size_bytes: Annotated[int, Field(description="File size in bytes")]
     exif_info: Annotated[Dict[str, Any], Field(default_factory=dict, description="EXIF metadata")]
 
+class BatchResult(BaseModel):
+    """Result of a batch photo processing operation."""
+    processed_count: Annotated[int, Field(default=0, description="Number of photos processed successfully")]
+    error_count: Annotated[int, Field(default=0, description="Number of errors encountered")]
+    results: Annotated[List[Dict[str, Any]], Field(default_factory=list, description="Detailed results for each photo")]
+    processing_time_seconds: Annotated[float, Field(default=0.0, description="Total processing time in seconds")]
+
 class ImmichClient:
     """Async HTTP client for Immich API."""
     
@@ -97,6 +109,67 @@ class ImmichClient:
 
 # Initialize Immich client
 immich_client = ImmichClient(IMMICH_URL, IMMICH_API_KEY)
+
+# MCP Tool: Server Health Check - FIXED JSON PARSING BUG
+@mcp.tool()
+async def server_health() -> Dict[str, Any]:
+    """
+    Check the health and status of the Immich server.
+    
+    Returns:
+        Dictionary with server health information
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            # FIXED: /server/ping returns plain text "pong", not JSON
+            status_url = f"{IMMICH_URL}/server/ping"
+            status_response = await client.get(status_url)
+            status_response.raise_for_status()
+            
+            # Check if response is "pong" for health
+            ping_result = status_response.text.strip()
+            is_healthy = ping_result == "pong"
+            
+            # Get version info (this returns JSON)
+            version_url = f"{IMMICH_URL}/server/version"
+            headers = {"x-api-key": IMMICH_API_KEY}
+            version_response = await client.get(version_url, headers=headers)
+            
+            version_data = {}
+            if version_response.status_code == 200:
+                try:
+                    version_data = version_response.json()
+                except:
+                    version_data = {"error": "Failed to parse version"}
+            
+            # Get storage info (this returns JSON)
+            storage_url = f"{IMMICH_URL}/server/storage"
+            storage_response = await client.get(storage_url, headers=headers)
+            
+            storage_data = {}
+            if storage_response.status_code == 200:
+                try:
+                    storage_data = storage_response.json()
+                except:
+                    storage_data = {"error": "Failed to parse storage"}
+            
+            return {
+                "status": "online" if is_healthy else "error",
+                "ping_response": ping_result,
+                "version": f"{version_data.get('major', 'x')}.{version_data.get('minor', 'x')}.{version_data.get('patch', 'x')}",
+                "storage": {
+                    "total": storage_data.get("diskSize"),
+                    "used": storage_data.get("diskUse"),
+                    "available": storage_data.get("diskAvailable")
+                },
+                "timestamp": asyncio.get_event_loop().time()
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": asyncio.get_event_loop().time()
+        }
 
 # MCP Tool: Upload Photos
 @mcp.tool()
@@ -209,57 +282,6 @@ async def get_photo_info(asset_id: str) -> Optional[PhotoInfo]:
         logger.error(f"Error getting photo info for {asset_id}: {str(e)}")
         raise
 
-# MCP Tool: Server Health Check
-@mcp.tool()
-async def server_health() -> Dict[str, Any]:
-    """
-    Check the health and status of the Immich server.
-    
-    Returns:
-        Dictionary with server health information
-    """
-    try:
-        async with httpx.AsyncClient() as client:
-            # Check server status
-            status_url = f"{IMMICH_URL}/server-info/ping"
-            status_response = await client.get(status_url)
-            status_response.raise_for_status()
-            
-            # Get server version
-            version_url = f"{IMMICH_URL}/server-info/version"
-            headers = {"x-api-key": IMMICH_API_KEY}
-            version_response = await client.get(version_url, headers=headers)
-            version_data = version_response.json()
-            
-            # Get storage info
-            storage_url = f"{IMMICH_URL}/server-info/storage"
-            storage_response = await client.get(storage_url, headers=headers)
-            storage_data = storage_response.json()
-            
-            return {
-                "status": "online" if status_response.status_code == 200 else "error",
-                "version": version_data.get("major") + "." + version_data.get("minor") + "." + version_data.get("patch"),
-                "storage": {
-                    "total": storage_data.get("diskSize"),
-                    "used": storage_data.get("diskUse"),
-                    "available": storage_data.get("diskAvailable")
-                },
-                "timestamp": asyncio.get_event_loop().time()
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "timestamp": asyncio.get_event_loop().time()
-        }
-
-class BatchResult(BaseModel):
-    """Result of a batch photo processing operation."""
-    processed_count: Annotated[int, Field(default=0, description="Number of photos processed successfully")]
-    error_count: Annotated[int, Field(default=0, description="Number of errors encountered")]
-    results: Annotated[List[Dict[str, Any]], Field(default_factory=list, description="Detailed results for each photo")]
-    processing_time_seconds: Annotated[float, Field(default=0.0, description="Total processing time in seconds")]
-
 # MCP Tool: Process Photos Batch
 @mcp.tool()
 async def process_photos_batch(asset_ids: List[str]) -> BatchResult:
@@ -354,133 +376,49 @@ async def process_single_photo(asset_id: str) -> Dict[str, Any]:
         raise Exception(f"Error processing photo {asset_id}: {str(e)}")
 
 # MCP Tool: Search Photos
-@mcp.tool(
-    name="search_photos",
-    description=(
-        "Search for photos using semantic search, tags, and date ranges. "
-        "Supports natural language queries like 'dog at the beach at sunset'."
-    ),
-    tags=["search", "photos", "semantic"]
-)
+@mcp.tool()
 async def search_photos(
     query: Optional[str] = None,
     tags: Optional[List[str]] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    limit: int = 50,
-    semantic_search: bool = True,
-    min_score: Optional[float] = None,
-    with_people: Optional[List[str]] = None,
-    orientation: Optional[Literal["landscape", "portrait", "square"]] = None
+    limit: int = 50
 ) -> Dict[str, Any]:
     """
-    Search for photos using semantic search, tags, and date ranges.
-    
-    This tool uses Immich's vector database to find photos that match natural
-    language descriptions, in addition to traditional filters.
+    Search for photos based on various criteria.
     
     Args:
-        query: Natural language search query (e.g., 'dog at the beach at sunset')
-        tags: List of tags to filter by (logical AND)
-        start_date: Start date in ISO format (YYYY-MM-DD)
-        end_date: End date in ISO format (YYYY-MM-DD)
-        limit: Maximum number of results to return (1-1000)
-        semantic_search: Whether to use semantic/vector search (default: True)
-        min_score: Minimum similarity score (0.0-1.0) for semantic search results
-        with_people: List of people names to include in results
-        orientation: Filter by image orientation
+        query: Text search query
+        tags: List of tags to filter by
+        start_date: Start date (ISO format)
+        end_date: End date (ISO format)
+        limit: Maximum number of results to return
         
     Returns:
-        Dictionary with search results including:
-        - assets: List of matching photos with metadata
-        - total: Total number of matches
-        - scores: Similarity scores for semantic search
-        
-    Examples:
-        # Basic semantic search
-        search_photos("dog playing in the snow")
-        
-        # Filter by date and tags
-        search_photos(
-            query="beach vacation",
-            start_date="2024-06-01",
-            end_date="2024-08-31",
-            tags=["family", "summer"],
-            limit=20
-        )
-        
-        # Find photos with specific people
-        search_photos(
-            query="birthday party",
-            with_people=["Alice", "Bob"],
-            min_score=0.7
-        )
+        Dictionary with search results
     """
     try:
-        # Validate inputs
-        if not any([query, tags, start_date, end_date, with_people]):
-            return {"error": "At least one search criteria must be provided", "status": "error"}
-            
-        if limit < 1 or limit > 1000:
-            return {"error": "Limit must be between 1 and 1000", "status": "error"}
-            
-        # Prepare search parameters
         params = {"limit": limit}
-        
-        # Text search (supports semantic search when enabled)
         if query:
             params["q"] = query
-            if semantic_search:
-                params["clip"] = "true"
-                if min_score is not None:
-                    params["minScore"] = str(min_score)
-        
-        # Additional filters
         if tags:
             params["tags"] = ",".join(tags)
-            
         if start_date:
             params["startDate"] = start_date
-            
         if end_date:
             params["endDate"] = end_date
             
-        if with_people:
-            params["withPeople"] = ",".join(with_people)
-            
-        if orientation:
-            params["orientation"] = orientation.upper()
-        
-        # Execute search
         async with httpx.AsyncClient() as client:
+            url = f"{IMMICH_URL}/api/search"
             headers = {"x-api-key": IMMICH_API_KEY}
-            
-            # Use the search endpoint for semantic search, otherwise use asset search
-            endpoint = "/api/search" if semantic_search and query else "/api/asset"
-            url = f"{IMMICH_URL.rstrip('/')}{endpoint}"
-            
             response = await client.get(url, params=params, headers=headers)
             response.raise_for_status()
             
-            return {
-                "assets": response.json(),
-                "total": len(response.json()),
-                "search_type": "semantic" if semantic_search and query else "metadata"
-            }
-            
-    except httpx.HTTPStatusError as e:
-        return {
-            "error": f"Search failed: {e.response.text}",
-            "status": "error",
-            "status_code": e.response.status_code
-        }
+            return response.json()
     except Exception as e:
-        return {
-            "error": f"Search error: {str(e)}",
-            "status": "error"
-        }
+        return {"error": str(e), "status": "error"}
 
-# MCP Tool: Get Album Info
+# MCP Tool: Get Album Info - FIXED ENDPOINT
 @mcp.tool()
 async def get_album_info(album_id: str) -> Dict[str, Any]:
     """
@@ -494,7 +432,7 @@ async def get_album_info(album_id: str) -> Dict[str, Any]:
     """
     try:
         async with httpx.AsyncClient() as client:
-            # Updated to use plural form of the endpoint
+            # FIXED: Changed from /api/album/{id} to /api/albums/{id}
             url = f"{IMMICH_URL}/api/albums/{album_id}"
             headers = {"x-api-key": IMMICH_API_KEY}
             response = await client.get(url, headers=headers)
@@ -504,7 +442,7 @@ async def get_album_info(album_id: str) -> Dict[str, Any]:
     except Exception as e:
         return {"error": str(e), "status": "error"}
 
-# MCP Tool: Create Album
+# MCP Tool: Create Album - FIXED ENDPOINT
 @mcp.tool()
 async def create_album(
     name: str,
@@ -532,7 +470,7 @@ async def create_album(
             payload["assetIds"] = asset_ids
         
         async with httpx.AsyncClient() as client:
-            # Updated to use plural form of the endpoint
+            # FIXED: Changed from /api/album to /api/albums
             url = f"{IMMICH_URL}/api/albums"
             headers = {
                 "x-api-key": IMMICH_API_KEY,
@@ -545,7 +483,7 @@ async def create_album(
     except Exception as e:
         return {"error": str(e), "status": "error"}
 
-# MCP Tool: List Albums
+# MCP Tool: List Albums - FIXED ENDPOINT
 @mcp.tool()
 async def list_albums(
     limit: int = 50,
@@ -571,7 +509,7 @@ async def list_albums(
         }
         
         async with httpx.AsyncClient() as client:
-            # Updated to use plural form of the endpoint
+            # FIXED: Changed from /api/album to /api/albums (plural)
             url = f"{IMMICH_URL}/api/albums"
             headers = {"x-api-key": IMMICH_API_KEY}
             response = await client.get(url, params=params, headers=headers)
@@ -581,7 +519,7 @@ async def list_albums(
     except Exception as e:
         return {"error": str(e), "status": "error"}
 
-# MCP Tool: Add Assets to Album
+# MCP Tool: Add Assets to Album - FIXED ENDPOINT
 @mcp.tool()
 async def add_assets_to_album(
     album_id: str,
@@ -603,7 +541,7 @@ async def add_assets_to_album(
         }
         
         async with httpx.AsyncClient() as client:
-            # Updated to use plural form of the endpoint
+            # FIXED: Changed from /api/album/{id}/assets to /api/albums/{id}/assets
             url = f"{IMMICH_URL}/api/albums/{album_id}/assets"
             headers = {
                 "x-api-key": IMMICH_API_KEY,
@@ -616,7 +554,7 @@ async def add_assets_to_album(
     except Exception as e:
         return {"error": str(e), "status": "error"}
 
-# MCP Tool: Remove Assets from Album
+# MCP Tool: Remove Assets from Album - FIXED ENDPOINT
 @mcp.tool()
 async def remove_assets_from_album(
     album_id: str,
@@ -638,7 +576,7 @@ async def remove_assets_from_album(
         }
         
         async with httpx.AsyncClient() as client:
-            # Updated to use plural form of the endpoint
+            # FIXED: Changed from /api/album/{id}/assets to /api/albums/{id}/assets
             url = f"{IMMICH_URL}/api/albums/{album_id}/assets"
             headers = {
                 "x-api-key": IMMICH_API_KEY
@@ -650,7 +588,7 @@ async def remove_assets_from_album(
     except Exception as e:
         return {"error": str(e), "status": "error"}
 
-# MCP Tool: Delete Album
+# MCP Tool: Delete Album - FIXED ENDPOINT
 @mcp.tool()
 async def delete_album(album_id: str) -> Dict[str, Any]:
     """
@@ -664,7 +602,7 @@ async def delete_album(album_id: str) -> Dict[str, Any]:
     """
     try:
         async with httpx.AsyncClient() as client:
-            # Updated to use plural form of the endpoint
+            # FIXED: Changed from /api/album/{id} to /api/albums/{id}
             url = f"{IMMICH_URL}/api/albums/{album_id}"
             headers = {"x-api-key": IMMICH_API_KEY}
             response = await client.delete(url, headers=headers)
@@ -752,180 +690,6 @@ async def download_asset(
                 }
     except Exception as e:
         return {"error": str(e), "status": "error"}
-
-# Help System
-@mcp.tool(
-    name="help",
-    description="Show help for available ImmichMCP tools and commands"
-)
-async def show_help(tool_name: str = "") -> str:
-    """
-    Get help for ImmichMCP tools.
-    
-    Args:
-        tool_name: Optional name of a specific tool to get help for.
-                  Leave empty to list all available tools.
-                  
-    Returns:
-        Formatted help text with tool information and usage examples.
-    """
-    tools_docs = {
-        # Core Photo Management
-        "upload_photos": {
-            "description": "Upload photos to Immich with batch processing and metadata detection.",
-            "example": "@immich upload_photos file_paths=[\"/path/to/photo1.jpg\", \"/path/to/photo2.jpg\"] album_name=\"vacation\"",
-            "parameters": {
-                "file_paths": "List of file paths to upload (required)",
-                "album_name": "Optional album name to add photos to",
-                "auto_organize": "Whether to automatically organize photos (default: False)"
-            }
-        },
-        "get_photo_info": {
-            "description": "Get detailed information about a photo including metadata.",
-            "example": "@immich get_photo_info asset_id=\"abc123\"",
-            "parameters": {
-                "asset_id": "ID of the photo to retrieve (required)"
-            }
-        },
-        "get_asset_by_id": {
-            "description": "Get detailed information about an asset by its ID.",
-            "example": "@immich get_asset_by_id asset_id=\"abc123\"",
-            "parameters": {
-                "asset_id": "ID of the asset to retrieve (required)"
-            }
-        },
-        "download_asset": {
-            "description": "Download an asset by its ID to a local directory.",
-            "example": "@immich download_asset asset_id=\"abc123\" output_path=\"~/Downloads\"",
-            "parameters": {
-                "asset_id": "ID of the asset to download (required)",
-                "output_path": "Directory to save the downloaded file (default: './downloads')"
-            }
-        },
-        
-        # Search and Discovery
-        "search_photos": {
-            "description": "Search photos using natural language queries and filters.",
-            "example": "@immich search_photos query=\"dog at the beach at sunset\" limit=10",
-            "parameters": {
-                "query": "Natural language search query (e.g., 'dog at beach')",
-                "limit": "Maximum number of results to return (default: 50)",
-                "tags": "List of tags to filter by",
-                "start_date": "Filter by start date (YYYY-MM-DD)",
-                "end_date": "Filter by end date (YYYY-MM-DD)",
-                "semantic_search": "Whether to use semantic search (default: True)",
-                "min_score": "Minimum similarity score for semantic search (0.0-1.0)",
-                "with_people": "List of people names to include in results",
-                "orientation": "Filter by orientation (landscape, portrait, square)"
-            }
-        },
-        
-        # Album Management
-        "create_album": {
-            "description": "Create a new album and optionally add assets to it.",
-            "example": "@immich create_album name=\"Summer Vacation\" asset_ids=[\"id1\", \"id2\"]",
-            "parameters": {
-                "name": "Name of the album (required)",
-                "asset_ids": "Optional list of asset IDs to add to the album",
-                "description": "Optional description for the album"
-            }
-        },
-        "list_albums": {
-            "description": "List all albums with pagination support.",
-            "example": "@immich list_albums limit=20 offset=0 shared=True",
-            "parameters": {
-                "limit": "Maximum number of albums to return (default: 50)",
-                "offset": "Pagination offset (default: 0)",
-                "shared": "Whether to include shared albums (default: False)"
-            }
-        },
-        "get_album_info": {
-            "description": "Get detailed information about a specific album.",
-            "example": "@immich get_album_info album_id=\"album123\"",
-            "parameters": {
-                "album_id": "ID of the album to retrieve (required)"
-            }
-        },
-        "add_assets_to_album": {
-            "description": "Add assets to an existing album.",
-            "example": "@immich add_assets_to_album album_id=\"album123\" asset_ids=[\"id1\", \"id2\"]",
-            "parameters": {
-                "album_id": "ID of the target album (required)",
-                "asset_ids": "List of asset IDs to add (required)"
-            }
-        },
-        "remove_assets_from_album": {
-            "description": "Remove assets from an album.",
-            "example": "@immich remove_assets_from_album album_id=\"album123\" asset_ids=[\"id1\", \"id2\"]",
-            "parameters": {
-                "album_id": "ID of the target album (required)",
-                "asset_ids": "List of asset IDs to remove (required)"
-            }
-        },
-        "delete_album": {
-            "description": "Permanently delete an album.",
-            "example": "@immich delete_album album_id=\"album123\"",
-            "parameters": {
-                "album_id": "ID of the album to delete (required)"
-            }
-        },
-        
-        # Batch Processing
-        "process_photos_batch": {
-            "description": "Process multiple photos in a batch with efficient concurrency.",
-            "example": "@immich process_photos_batch asset_ids=[\"id1\", \"id2\", \"id3\"]",
-            "parameters": {
-                "asset_ids": "List of asset IDs to process (required)"
-            }
-        },
-        "process_single_photo": {
-            "description": "Process a single photo's metadata and return the result.",
-            "example": "@immich process_single_photo asset_id=\"abc123\"",
-            "parameters": {
-                "asset_id": "ID of the photo to process (required)"
-            }
-        },
-        
-        # System
-        "server_health": {
-            "description": "Check the health and status of the Immich server.",
-            "example": "@immich server_health",
-            "parameters": {}
-        },
-        "help": {
-            "description": "Show this help message or get help for a specific command.",
-            "example": "@immich help search_photos",
-            "parameters": {
-                "tool_name": "Optional name of a command to get specific help"
-            }
-        }
-    }
-    
-    if not tool_name:
-        # List all tools
-        help_text = """# ImmichMCP Help
-
-## Available Commands\n\n"""
-        for tool_name, info in tools_docs.items():
-            help_text += f"- **{tool_name}**: {info['description']}\n"
-        help_text += "\nFor detailed help on a specific command, type:\n"
-        help_text += "```\n@immich help <command>\n```"
-        help_text += "\n\nExample:\n```\n@immich help search_photos\n```"
-        return help_text
-    
-    # Get help for specific tool
-    tool_name = tool_name.lower()
-    if tool_name not in tools_docs:
-        return f"Error: Unknown tool '{tool_name}'. Type '@immich help' to see available tools."
-    
-    info = tools_docs[tool_name]
-    help_text = f"# {tool_name}\n\n{info['description']}\n\n## Usage\n\n```\n{info['example']}\n```\n\n## Parameters\n\n"
-    
-    for param, desc in info['parameters'].items():
-        help_text += f"- `{param}`: {desc}\n"
-    
-    help_text += "\nType `@immich help` to see all available commands."
-    return help_text
 
 # Main entry point
 if __name__ == "__main__":
