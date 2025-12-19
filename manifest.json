@@ -1,8 +1,8 @@
 {
-  "dxt_version": "0.1",
+  "manifest_version": "0.2",
   "name": "immich-mcp",
-  "version": "1.0.0",
-  "description": "Austrian efficiency for Immich photo management with FastMCP 2.11+ and GIMP integration. Search photos with natural language like 'dog at the beach at sunset' and edit with GIMP.",
+  "version": "1.1.0",
+  "description": "Austrian efficiency for Immich photo management with FastMCP 2.11+. Search photos with natural language or OCR text in 12+ languages. Manage your 2000+ photo library with v2.3.1+ compatibility.",
   "author": {
     "name": "sandraschi",
     "email": "sandra@example.com"
@@ -11,14 +11,19 @@
     "immich", "photo", "photos", "pictures", "images", "gallery", "library",
     "photo-management", "image-organization", "photo-storage", "media-server",
     "fastmcp", "mcp-server", "self-hosted", "open-source", "claude-desktop",
-    "gimp", "photo-editing", "semantic-search", "ai-search", "clip-embeddings"
+    "semantic-search", "ai-search", "clip-embeddings", "face-detection",
+    "people-tagging", "album-management", "photo-organization"
   ],
   "server": {
     "type": "python",
-    "entry_point": "immich_mcp_server.py",
+    "entry_point": "src/immich_mcp/server.py",
     "mcp_config": {
       "command": "python",
-      "args": ["immich_mcp_server.py"]
+      "args": ["src/immich_mcp/server.py"],
+      "env": {
+        "PYTHONPATH": "${PWD}/src",
+        "PYTHONUNBUFFERED": "1"
+      }
     }
   },
   "tools": [
@@ -27,24 +32,60 @@
       "description": "Upload photos to Immich with batch processing and metadata detection"
     },
     {
-      "name": "get_photo_info",
-      "description": "Get detailed information about a photo including metadata"
+      "name": "search_photos",
+      "description": "Search photos using CLIP smart search, OCR text search, or metadata queries"
     },
     {
-      "name": "search_photos",
-      "description": "Search photos using natural language queries (e.g., 'dog at the beach at sunset')"
+      "name": "get_photo_info",
+      "description": "Get complete metadata and EXIF information for a specific photo"
+    },
+    {
+      "name": "organize_photos_by_date",
+      "description": "Automatically organize photos into date-based albums"
+    },
+    {
+      "name": "delete_photos",
+      "description": "Delete photos with trash/permanent options"
+    },
+    {
+      "name": "create_album",
+      "description": "Create a new album with optional assets and description"
+    },
+    {
+      "name": "add_to_album",
+      "description": "Add photos to an existing album"
+    },
+    {
+      "name": "list_albums",
+      "description": "List all albums with metadata and statistics"
+    },
+    {
+      "name": "share_album",
+      "description": "Generate public share link for album"
+    },
+    {
+      "name": "detect_people",
+      "description": "Run face detection on photos and return clustering results"
+    },
+    {
+      "name": "tag_person",
+      "description": "Assign name to detected person/face cluster"
+    },
+    {
+      "name": "search_by_person",
+      "description": "Find all photos containing specific person"
+    },
+    {
+      "name": "get_storage_info",
+      "description": "Get storage usage statistics and performance metrics"
+    },
+    {
+      "name": "backup_photos",
+      "description": "Export photos for backup with metadata preservation"
     },
     {
       "name": "server_health",
-      "description": "Check the health and status of the Immich server"
-    },
-    {
-      "name": "process_photos_batch",
-      "description": "Process multiple photos with GIMP for batch editing"
-    },
-    {
-      "name": "edit_photo_with_gimp",
-      "description": "Edit a photo using GIMP with specified operations"
+      "description": "Check Immich server health and connection status"
     }
   ],
   "user_config": {
@@ -62,17 +103,15 @@
       "required": true,
       "sensitive": true
     },
-    "gimp_path": {
-      "type": "string",
-      "title": "GIMP Executable Path",
-      "description": "Path to GIMP executable (e.g., /usr/bin/gimp or C:\\Program Files\\GIMP 2\\bin\\gimp-2.10.exe)",
-      "required": false
-    },
     "log_level": {
       "type": "string",
       "title": "Logging Level",
       "description": "Logging verbosity level (debug, info, warning, error, critical)",
       "default": "info"
     }
+  },
+  "compatibility": {
+    "platforms": ["win32", "darwin", "linux"],
+    "python": ">=3.11"
   }
 }

@@ -1,10 +1,12 @@
 # Immich MCP Server API Documentation
 
-**FastMCP 2.0 Implementation** | **Austrian Dev Efficiency** | **Complete Photo Management**
+**FastMCP 2.0 Implementation** | **Immich v2.0.0+ Compatible** | **Complete Photo Management**
 
 ## Overview
 
 The Immich MCP Server provides comprehensive photo library management through natural language commands via the MCP (Model Context Protocol). Built with Austrian efficiency principles: working solutions in hours, not days.
+
+**Compatibility**: Fully compatible with Immich v2.0.0+ stable release. OCR search requires Immich v2.2.0+.
 
 ## Available Tools
 
@@ -28,17 +30,24 @@ Upload my vacation photos from /photos/vacation/ to a new album called "Vienna T
 
 #### `search_photos`
 
-CLIP-based intelligent photo search using natural language.
+Intelligent photo search using multiple methods: CLIP semantic search, OCR text extraction, metadata, or filename.
 
 **Parameters:**
 
-- `query` (str): Natural language search query
-- `limit` (int, default=20): Maximum results to return
+- `query` (str): Search query (natural language for smart/OCR, keywords for metadata)
+- `search_type` (str, default="smart"): Search method
+  - `"smart"`: CLIP-based semantic search (v1.0+)
+  - `"ocr"`: Text extraction search (v2.2.0+, requires Immich v2.2.0+)
+  - `"metadata"`: EXIF/metadata search (v1.0+)
+  - `"filename"`: Filename-based search (v1.0+)
+- `limit` (int, default=50): Maximum results to return (1-200)
 
-**Example:**
+**Examples:**
 
 ```
 Find photos of Benny (my dog) playing in the park
+Search for photos containing "invoice number 12345" using OCR
+Find photos with "Canon EOS" in metadata
 ```
 
 #### `get_photo_info`
@@ -242,9 +251,16 @@ Backup all photos from 2025 to /backup/photos/ with metadata
 
 #### `server_health`
 
-Check Immich server connection and health status.
+Check Immich server connection and health status. Detects v2.0.0+ and OCR capabilities.
 
 **Parameters:** None
+
+**Returns:**
+- `server_version`: Immich server version string
+- `is_v2_plus`: Boolean indicating v2.0.0+ compatibility
+- `has_ocr`: Boolean indicating OCR search support (v2.2.0+)
+- `server_features`: List of available server features
+- Connection status for database, Redis, storage, and ML services
 
 **Example:**
 

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "maintainers": ["sandraschi"],
+  "name": "immich-mcp",
+  "description": "FastMCP 2.11+ server for Immich photo library management. Compatible with Immich v2.3.1+ with enhanced multilingual OCR support.",
+  "type": "mcp_server",
+  "status": "beta",
+  "framework": "FastMCP 2.11+",
+  "tools": 10,
+  "transport": ["stdio"],
+  "keywords": [
+    "immich",
+    "photos",
+    "photo-management",
+    "library",
+    "ocr",
+    "mcp-server",
+    "fastmcp"
+  ],
+  "features": {
+    "photo_management": {
+      "enabled": true
+    },
+    "ocr_search": {
+      "enabled": true,
+      "requires": "Immich v2.3.1+"
+    },
+    "api_integration": {
+      "enabled": true,
+      "api": "Immich API"
+    }
+  }
+}
+

@@ -53,10 +53,11 @@
 **MCPB** (MCP Bundle) - Anthropic's official packaging format for MCP servers
 
 **Key Benefits**:
-- 🎯 **One-click installation** - Drag & drop to Claude Desktop
+- 🎯 **One-click installation** - Drag & drop to Claude Desktop (Claude Desktop only)
 - 🔒 **Security** - Cryptographically signed packages
 - ⚙️ **User configuration** - Interactive setup prompts
-- 📦 **Bundled dependencies** - Everything included
+- 📝 **Extensive prompt templates** - Required for Claude Desktop integration
+- ⚠️ **NO dependencies bundled** - Users must install dependencies separately
 - 🚀 **Automated distribution** - GitHub Actions integration
 
 ---
@@ -75,6 +76,16 @@
 | **Location** | `dist/notepadpp-mcp.mcpb` |
 
 ### **User Configuration**
+
+**⚠️ MCPB Installation (Claude Desktop Only):**
+
+1. Download the `.mcpb` file from releases
+2. Open Claude Desktop → Settings → MCP Servers
+3. **Drag and drop** the `.mcpb` file into Claude Desktop settings
+4. Configure settings when prompted
+5. Restart Claude Desktop
+
+**Note**: MCPB packages work ONLY in Claude Desktop. For other MCP clients, use npm/npx or local installation.
 
 When users install our MCPB package, they're prompted for:
 
@@ -207,7 +218,16 @@ When users install our MCPB package, they're prompted for:
   "user_config": {
     "notepadpp_path": { "type": "file", "title": "..." }
   },
-  "tools": [ /* 26 tools listed */ ]
+  "tools": [
+    {
+      "name": "tool_name_1",
+      "description": "Brief description of what this tool does"
+    },
+    {
+      "name": "tool_name_2",
+      "description": "Brief description of what this tool does"
+    }
+  ]
 }
 ```
 

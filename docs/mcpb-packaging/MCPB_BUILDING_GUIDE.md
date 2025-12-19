@@ -55,18 +55,37 @@
 
 ## 🌟 What is MCPB?
 
-MCPB (MCP Bundle) is a powerful framework developed by Anthropic specifically for packaging and distributing MCP (Model Control Protocol) servers. It provides a standardized way to package, version, and deploy MCP server implementations with all their dependencies.
+**MCPB (MCP Bundle) is the packaging format used EXCLUSIVELY for Claude Desktop installations.** It is NOT a general-purpose MCP packaging format.
+
+### ⚠️ **Critical MCPB Facts**
+
+1. **Claude Desktop Only**: MCPB packages work ONLY in Claude Desktop. For other MCP clients (Cursor, Windsurf, etc.), use standard installation methods.
+
+2. **NO Dependencies**: MCPB packages must NOT include any Python dependencies. Claude Desktop provides its own Python runtime. Users must install dependencies separately.
+
+3. **Extensive Prompt Templates Required**: MCPB packages MUST include comprehensive prompt templates in `prompts/` directory. Claude Desktop reads these to understand how to interact with your server.
+
+4. **Weird Installation**: MCPB packages are installed by dragging the `.mcpb` file into Claude Desktop settings. There is no command-line installer.
 
 ### Key Components of MCPB
 
-1. **MCPB CLI**: Command-line interface for managing the MCPB packaging and deployment lifecycle
-2. **MCPB Runtime**: Execution environment for MCP servers
-3. **MCPB Registry**: Central repository for versioned MCP server packages
-4. **MCPB SDK**: Tools and libraries for MCP server development
+1. **MCPB CLI**: Command-line interface for building `.mcpb` packages (npm install -g @anthropic-ai/mcpb)
+2. **Claude Desktop Runtime**: Claude Desktop provides the execution environment (Python runtime, MCP protocol handling)
+3. **Prompt Templates**: Extensive templates in `prompts/` directory that Claude Desktop reads
+4. **Manifest.json**: Configuration file that tells Claude Desktop how to run your server
+
+### What MCPB is NOT
+
+- ❌ **NOT a general MCP packaging format** - Only for Claude Desktop
+- ❌ **NOT a dependency bundler** - No dependencies are included
+- ❌ **NOT a command-line installer** - Installation is drag-and-drop only
+- ❌ **NOT for other MCP clients** - Use npm/npx or local installation for Cursor, Windsurf, etc.
 
 ## 🏗️ MCPB Manifest (mcpb_manifest.json)
 
-The `mcpb_manifest.json` file is the heart of any MCP server package. It defines the server's metadata, configuration, dependencies, and runtime requirements.
+The `manifest.json` file is the heart of any MCPB package. It defines the server's metadata, configuration, and runtime requirements.
+
+**⚠️ Important**: MCPB packages do NOT include dependencies. The manifest only defines how Claude Desktop should run your server. Dependencies must be installed separately by users.
 
 ### Manifest Creation Methods
 
@@ -485,20 +504,48 @@ For now, you can safely ignore any signing-related steps in the MCPB documentati
 
 ```json
 {
-  "mcpb_version": "0.1",
+  "manifest_version": "0.2",
   "name": "your-extension-name",
   "version": "1.0.0",
   "description": "Brief description of your extension",
-  "author": "Your Name <email@example.com>",
-  "license": "MIT",
+  "author": {
+    "name": "Your Name",
+    "email": "email@example.com"
+  },
   "server": {
     "type": "python",
-    "entry_point": "src/your_package/server.py"
+    "entry_point": "src/your_package/server.py",
+    "mcp_config": {
+      "command": "python",
+      "args": ["src/your_package/server.py"],
+      "env": {
+        "PYTHONPATH": "${PWD}/src",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
   },
-  "capabilities": {
-    "tools": true,
-    "resources": true,
-    "prompts": true
+  "tools": [
+    {
+      "name": "tool_name_1",
+      "description": "Brief description of what this tool does"
+    },
+    {
+      "name": "tool_name_2",
+      "description": "Brief description of what this tool does"
+    }
+  ],
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "API Key",
+      "description": "Your API key for the service",
+      "required": true,
+      "sensitive": true
+    }
+  },
+  "compatibility": {
+    "platforms": ["win32", "darwin", "linux"],
+    "python": ">=3.11"
   }
 }
 ```
@@ -508,11 +555,39 @@ For now, you can safely ignore any signing-related steps in the MCPB documentati
 1. **Server Configuration**
    - `type`: Must be "python" for Python-based extensions
    - `entry_point`: Path to your main server file
+   - `mcp_config`: Runtime configuration for executing the server
+     - `command`: Command to run (typically "python")
+     - `args`: Arguments to pass to the command
+     - `env`: Environment variables (use `${PWD}` for current directory, `${user_config.key}` for user config)
 
-2. **Capabilities**
-   - `tools`: Enable/disable tool support
-   - `resources`: Enable/disable resource handling
-   - `prompts`: Enable/disable prompt templates
+2. **Tools Array** (REQUIRED)
+   - **Format**: Array of objects with `name` and `description` fields
+   - **Required fields**: Each tool must have:
+     - `name` (string): The tool name as registered in your server code
+     - `description` (string): Brief description of what the tool does
+   - **Important**: Tools must be objects, NOT strings. The validator will reject string arrays.
+   - **Example**:
+     ```json
+     "tools": [
+       {
+         "name": "upload_photos",
+         "description": "Upload photos with batch processing"
+       },
+       {
+         "name": "search_photos",
+         "description": "Search photos using CLIP smart search"
+       }
+     ]
+     ```
+
+3. **User Configuration**
+   - Define user-configurable settings
+   - Each config item has `type`, `title`, `description`, `required`, and optionally `default` and `sensitive`
+   - Access in code via `${user_config.key_name}` in environment variables
+
+4. **Compatibility**
+   - `platforms`: Array of supported platforms ("win32", "darwin", "linux")
+   - `python`: Python version requirement (e.g., ">=3.11")
 
 ### Best Practices
 
@@ -550,11 +625,11 @@ your-mcp/
 
 ## 📦 PACKAGE MANIFEST
 
-### Manifest Fields
+### Complete Manifest Example
 
 ```json
 {
-  "mcpb_version": "0.1",
+  "manifest_version": "0.2",
   "name": "your-mcp-server",
   "version": "1.0.0",
   "description": "Brief description for extension store",
@@ -567,14 +642,36 @@ your-mcp/
     "entry_point": "src/your_mcp/server.py",
     "mcp_config": {
       "command": "python",
-      "args": ["-m", "your_mcp.server"],
-      "cwd": "src",
+      "args": ["src/your_mcp/server.py"],
       "env": {
-        "PYTHONPATH": "src",
+        "PYTHONPATH": "${PWD}/src",
         "EXTERNAL_TOOL": "${user_config.external_tool}",
         "PYTHONUNBUFFERED": "1"
       }
     }
+  },
+  "tools": [
+    {
+      "name": "tool_name_1",
+      "description": "Brief description of what this tool does"
+    },
+    {
+      "name": "tool_name_2",
+      "description": "Brief description of what this tool does"
+    }
+  ],
+  "user_config": {
+    "external_tool": {
+      "type": "string",
+      "title": "External Tool Path",
+      "description": "Path to external tool executable",
+      "required": false,
+      "default": ""
+    }
+  },
+  "compatibility": {
+    "platforms": ["win32", "darwin", "linux"],
+    "python": ">=3.11"
   }
 }
 ```
@@ -587,7 +684,7 @@ your-mcp/
 
 **Solution**: ALWAYS include these fields in Python-based DXT manifests. 
 
-**IMPORTANT**: Do NOT use `cwd` in `mcp_config` as it will cause validation to fail. Instead, ensure your Python path is set correctly using `PYTHONPATH` environment variable.
+**IMPORTANT**: Do NOT use `cwd` in `mcp_config` as it will cause validation to fail. Instead, ensure your Python path is set correctly using `PYTHONPATH` environment variable. Use `${PWD}/src` if your modules are in the `src/` directory.
 
 ```json
 {
@@ -596,13 +693,19 @@ your-mcp/
     "entry_point": "src/your_mcp/server.py",
     "mcp_config": {
       "command": "python",
-      "args": ["-m", "your_mcp.server"],
+      "args": ["src/your_mcp/server.py"],
       "env": {
-        "PYTHONPATH": "${PWD}",  // ⭐ CRITICAL: Use ${PWD} to reference the package root
+        "PYTHONPATH": "${PWD}/src",
         "PYTHONUNBUFFERED": "1"
       }
     }
-  }
+  },
+  "tools": [
+    {
+      "name": "your_tool",
+      "description": "Tool description"
+    }
+  ]
 }
 ```
 
@@ -611,22 +714,33 @@ your-mcp/
 ```
 your-extension.mcpb/
 ├── manifest.json
-├── requirements.txt
-├── src/                           // ⭐ Python modules here
+├── prompts/                       // ⭐ REQUIRED: Extensive prompt templates
+│   ├── system.md                 // System prompt (REQUIRED)
+│   ├── user.md                   // User templates (REQUIRED)
+│   ├── examples.json             // Usage examples (REQUIRED)
+│   └── ...
+├── src/                           // ⭐ Source code ONLY (no dependencies)
 │   └── your_mcp/
 │       ├── __init__.py
 │       ├── server.py              // Entry point
 │       └── ...
-└── lib/                           // Dependencies here
-    ├── fastmcp/
-    └── ...
+└── README.md                      // Documentation
 ```
 
-## 📝 PROMPTS CONFIGURATION
+**⚠️ Note**: MCPB packages do NOT include:
+- ❌ `requirements.txt` (dependencies not bundled)
+- ❌ `lib/` or `dependencies/` directories (no bundled libraries)
+- ❌ Virtual environments (Claude Desktop provides Python runtime)
+
+## 📝 PROMPTS CONFIGURATION (REQUIRED)
+
+### ⚠️ **Critical: Prompt Templates are REQUIRED**
+
+MCPB packages MUST include extensive prompt templates. Claude Desktop reads these prompts to understand how to interact with your MCP server. Without comprehensive prompts, Claude Desktop cannot properly use your tools.
 
 ### Prompt Files Structure
 
-DXT supports three types of prompt files that should be placed in a `prompts/` directory:
+MCPB requires extensive prompt files in a `prompts/` directory:
 
 ```
 your-extension.mcpb/
@@ -691,10 +805,15 @@ Add a `prompts` section to your manifest.json:
 ### Best Practices for Prompts
 
 1. **Be Specific**: Clearly define the AI's capabilities and limitations
-2. **Use Markdown**: Format prompts with headers, lists, and code blocks
-3. **Version Control**: Track prompt changes in version control
-4. **Test Thoroughly**: Validate prompts with various inputs
-5. **Keep Secure**: Don't include sensitive information in prompts
+2. **Be Extensive**: Claude Desktop relies heavily on these prompts - make them comprehensive
+3. **Use Markdown**: Format prompts with headers, lists, and code blocks for readability
+4. **Include Examples**: Provide multiple real-world examples of tool usage
+5. **Version Control**: Track prompt changes in version control
+6. **Test Thoroughly**: Validate prompts with various inputs and scenarios
+7. **Keep Secure**: Don't include sensitive information in prompts
+8. **Update Regularly**: Keep prompts in sync with your tool implementations
+
+**Why Prompts Are Critical**: Claude Desktop reads these prompts to understand your MCP server. Without comprehensive prompts, Claude Desktop cannot properly generate tool calls or understand when to use your tools.
 6. **Document Assumptions**: Note any assumptions about the environment or user knowledge
 
 ## 🚀 GITHUB RELEASES & CI/CD
@@ -1530,11 +1649,18 @@ jobs:
           
           Download the `.mcpb` file below and drag it to Claude Desktop for one-click installation.
           
-          ### Installation
+          ### Installation (Claude Desktop Only)
+          
+          **⚠️ MCPB packages work ONLY in Claude Desktop. For other MCP clients, use npm/npx or local installation.**
+          
+          **Weird Installation Procedure:**
           1. Download the `.mcpb` file from the assets below
-          2. Drag the file to Claude Desktop
-          3. Follow the configuration prompts
-          4. Restart Claude Desktop
+          2. Open Claude Desktop and go to **Settings → MCP Servers**
+          3. **Drag and drop** the `.mcpb` file into the Claude Desktop settings window
+          4. Follow the configuration prompts (API keys, URLs, etc.)
+          5. **Restart Claude Desktop** to activate the server
+          
+          **Note**: There is no command-line installer. The drag-and-drop method is the only way to install MCPB packages.
           
           ### Dependencies
           - FastMCP 2.10.1+ (bundled)

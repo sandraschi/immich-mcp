@@ -5,7 +5,7 @@ Welcome to ImmichMCP! This guide will help you manage your Immich photo library 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Running Immich server (v1.90.0 or later)
+- Running Immich server v2.0.0+ (v2.2.0+ recommended for OCR search)
 - Claude Desktop with MCP support
 - Immich API key
 
@@ -17,7 +17,7 @@ Welcome to ImmichMCP! This guide will help you manage your Immich photo library 
    IMMICH_URL=http://your-immich-server:2283
    IMMICH_API_KEY=your_api_key_here
    ```
-4. Start the server: `python immich_mcp_server.py`
+4. Start the server: `python src/immich_mcp/server.py`
 
 ## 💬 Natural Language Examples
 
@@ -37,8 +37,24 @@ Welcome to ImmichMCP! This guide will help you manage your Immich photo library 
 ### Advanced Search
 - "Find all photos taken in Tokyo with good lighting"
 - "Show me photos of dogs from last year"
+- "Find photos containing text 'invoice number 12345'" (OCR search, v2.2.0+)
+- "Search for photos with 'receipt' text using OCR" (OCR search, v2.2.0+)
 - "Find duplicate photos in my library"
 - "Show me all photos with more than 3 stars"
+
+### OCR Search (Immich v2.2.0+)
+
+OCR (Optical Character Recognition) search allows you to find photos by text content extracted from images:
+
+- "Find photos with 'Vienna' written in them"
+- "Search for receipts containing '€100'"
+- "Show me photos with text '2025-01-27'"
+- "Find images with 'invoice' text"
+
+OCR search automatically extracts text from images and makes it searchable. This is especially useful for:
+- Finding photos of documents, receipts, or signs
+- Searching for photos with specific dates or numbers
+- Locating images containing specific text content
 
 ## 🖼️ Photo Viewing (Experimental)
 
@@ -56,7 +72,7 @@ Download the last 10 photos I took to ./recent_photos
 ### Option 2: Web Server Mode
 Start the server in web mode to view photos in a browser:
 ```bash
-python immich_mcp_server.py --web
+python src/immich_mcp/server.py --web
 ```
 Then open `http://localhost:8000` in your browser.
 
@@ -95,6 +111,8 @@ You can extend ImmichMCP by adding new tools. See the developer documentation fo
 ## 📝 Tips & Tricks
 
 - Use natural language to describe what you're looking for
+- For text-based searches, use OCR search type (requires v2.2.0+)
 - Combine multiple criteria in your searches
 - Create smart albums with dynamic queries
 - Use tags and metadata to improve search results
+- Check server health to verify OCR capability before using OCR search
