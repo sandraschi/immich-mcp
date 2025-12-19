@@ -2,7 +2,7 @@
 ImmichMCP - FastMCP 2.10 Server for Immich Photo Management
 
 Austrian efficiency for Sandra's 2000+ photo library.
-Provides 15 tools: 5 core photo operations + 4 album management + 3 people/faces + 3 administration
+Provides 25+ tools: 5 core photo operations + 4 album management + 3 people/faces + 7 library management + 3 multi-user support + 3 administration
 """
 
 import asyncio
@@ -44,6 +44,9 @@ logger = logging.getLogger("immich_mcp")
 # Global API client instance
 api_client: ImmichAPIClient | None = None
 
+# Global config instance for user management
+config: ImmichConfig | None = None
+
 
 class ImmichMCP(FastMCP):
     """ImmichMCP server implementation extending FastMCP 2.10 base."""
@@ -57,11 +60,10 @@ class ImmichMCP(FastMCP):
         # Set default values if not provided
         kwargs.setdefault("name", "ImmichMCP")
         kwargs.setdefault("version", "1.0.0")
-        kwargs.setdefault("log_level", "INFO")
 
-        # Initialize FastMCP with only the parameters it accepts
+        # Initialize FastMCP without deprecated log_level parameter
         super().__init__(
-            name=kwargs["name"], version=kwargs["version"], log_level=kwargs["log_level"]
+            name=kwargs["name"], version=kwargs["version"]
         )
         self.immich_client: ImmichAPIClient | None = None
         self.app = FastAPI(
@@ -79,11 +81,12 @@ class ImmichMCP(FastMCP):
 
     async def startup_event(self):
         """Initialize resources when the server starts."""
+        global config
         try:
             # Get the config and initialize the Immich client
             config = get_config()
             self.immich_client = ImmichAPIClient(config=config)
-            logger.info("Immich client initialized successfully")
+            logger.info(f"Immich client initialized for user: {config.active_user}")
         except Exception as e:
             logger.error("Failed to initialize Immich client: %s", e)
             raise
@@ -2071,6 +2074,557 @@ async def server_health() -> HealthStatus:
         )
 
 
+# ===== LIBRARY MANAGEMENT TOOLS =====
+
+@mcp.tool()
+async def list_libraries() -> list[dict]:
+    """List all available Immich libraries.
+
+    Returns comprehensive information about all libraries configured on the server,
+    including their types, locations, and statistics. Essential for understanding
+    your photo library organization and managing external folder imports.
+
+    Austrian efficiency: Complete library overview in one call.
+    """
+    try:
+        client = await get_api_client()
+        libraries = await client.get_libraries()
+
+        # Add some user-friendly enhancements
+        for lib in libraries:
+            lib["location_count"] = len(lib.get("importPaths", []))
+            lib["has_exclusions"] = bool(lib.get("exclusionPatterns"))
+
+        return libraries
+    except Exception as e:
+        logger.error(f"Failed to list libraries: {e}")
+        return []
+
+
+@mcp.tool()
+async def get_library_info(library_id: str) -> dict:
+    """Get detailed information about a specific Immich library.
+
+    Provides comprehensive details about a library including its configuration,
+    import paths, exclusion patterns, statistics, and current status. Perfect for
+    understanding how external folders are configured and monitored.
+
+    Args:
+        library_id: The unique identifier of the library to examine
+
+    Returns:
+        Complete library information with metadata and configuration details
+    """
+    try:
+        client = await get_api_client()
+        library_info = await client.get_library_info(library_id)
+
+        # Get additional location details
+        try:
+            locations = await client.get_library_locations(library_id)
+            library_info["locations"] = locations
+        except Exception:
+            library_info["locations"] = []
+
+        return library_info
+    except Exception as e:
+        logger.error(f"Failed to get library info for {library_id}: {e}")
+        return {"error": str(e), "library_id": library_id}
+
+
+@mcp.tool()
+async def create_library(
+    name: str,
+    library_type: str = "UPLOAD",
+    import_paths: list[str] | None = None,
+    exclusion_patterns: list[str] | None = None
+) -> dict:
+    """Create a new Immich library for organizing external photo folders.
+
+    Libraries allow you to organize photos from different external folders,
+    set up import paths, and configure exclusion patterns. This solves the
+    'unwieldy external folder management' problem by providing structured
+    library organization.
+
+    Args:
+        name: Descriptive name for the library (e.g., "Vacation Photos", "Work Projects")
+        library_type: Type of library - "UPLOAD" for user uploads, "IMPORT" for external folders
+        import_paths: List of file system paths to import photos from (for IMPORT libraries)
+        exclusion_patterns: Glob patterns to exclude from imports (e.g., ["*.tmp", "cache/**"])
+
+    Returns:
+        Created library information with ID and configuration details
+
+    Austrian efficiency: One-click library creation with full configuration.
+    """
+    try:
+        client = await get_api_client()
+
+        # Validate import paths exist (for IMPORT libraries)
+        if library_type == "IMPORT" and import_paths:
+            for path in import_paths:
+                if not Path(path).exists():
+                    return {
+                        "error": f"Import path does not exist: {path}",
+                        "suggestion": "Verify the path is accessible and try again"
+                    }
+
+        library = await client.create_library(
+            name=name,
+            library_type=library_type,
+            import_paths=import_paths,
+            exclusion_patterns=exclusion_patterns
+        )
+
+        return {
+            "success": True,
+            "library": library,
+            "message": f"Library '{name}' created successfully",
+            "type": library_type,
+            "import_paths_count": len(import_paths or []),
+            "next_steps": [
+                "Add more import paths if needed",
+                "Configure exclusion patterns",
+                "Run initial scan to import photos"
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Failed to create library '{name}': {e}")
+        return {
+            "error": str(e),
+            "suggestion": "Check library name uniqueness and path permissions"
+        }
+
+
+@mcp.tool()
+async def scan_library(
+    library_id: str,
+    refresh_modified_files: bool = False,
+    refresh_all_files: bool = False
+) -> dict:
+    """Scan a library for new or changed photos from external folders.
+
+    This is the key solution to 'unwieldy external folder management' - instead
+    of manually managing folder imports, libraries can be scanned to automatically
+    discover and import new photos from configured external paths.
+
+    Args:
+        library_id: The library ID to scan
+        refresh_modified_files: Also refresh metadata for modified files (slower)
+        refresh_all_files: Refresh all files regardless of modification date (slowest)
+
+    Returns:
+        Scan results with statistics on discovered and imported photos
+
+    Austrian efficiency: Automated photo discovery from external folders.
+    """
+    try:
+        client = await get_api_client()
+
+        # Get library info first for context
+        library_info = await client.get_library_info(library_id)
+
+        # Perform the scan
+        scan_result = await client.scan_library(
+            library_id=library_id,
+            refresh_modified_files=refresh_modified_files,
+            refresh_all_files=refresh_all_files
+        )
+
+        # Calculate scan scope
+        scope = "new files only"
+        if refresh_modified_files:
+            scope = "new and modified files"
+        if refresh_all_files:
+            scope = "all files (full refresh)"
+
+        return {
+            "success": True,
+            "library_name": library_info.get("name", "Unknown"),
+            "scan_scope": scope,
+            "scan_result": scan_result,
+            "message": f"Library scan completed for {scope}",
+            "tips": [
+                "Use refresh_modified_files for regular updates",
+                "Use refresh_all_files for initial setup or major changes",
+                "Check scan results for any import errors"
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Failed to scan library {library_id}: {e}")
+        return {
+            "error": str(e),
+            "library_id": library_id,
+            "suggestion": "Verify library exists and has valid import paths"
+        }
+
+
+@mcp.tool()
+async def add_library_location(library_id: str, path: str) -> dict:
+    """Add a new external folder path to an Immich library.
+
+    This directly addresses the 'unwieldy external folder management' issue by
+    allowing you to easily add new photo folders to your library organization.
+    No more manual folder management - just add the path and scan.
+
+    Args:
+        library_id: The library ID to add the location to
+        path: Full file system path to add (e.g., "D:\\Photos\\Vacation")
+
+    Returns:
+        Updated library configuration with new location
+
+    Austrian efficiency: Simple external folder integration.
+    """
+    try:
+        client = await get_api_client()
+
+        # Validate path exists
+        if not Path(path).exists():
+            return {
+                "error": f"Path does not exist: {path}",
+                "suggestion": "Verify the path is correct and accessible"
+            }
+
+        # Add the location
+        result = await client.add_library_location(library_id, path)
+
+        # Get updated library info
+        library_info = await client.get_library_info(library_id)
+
+        return {
+            "success": True,
+            "library_name": library_info.get("name", "Unknown"),
+            "new_location": path,
+            "total_locations": len(library_info.get("importPaths", [])),
+            "result": result,
+            "message": f"Added location '{path}' to library",
+            "next_steps": [
+                "Run scan_library to import photos from new location",
+                "Configure exclusion patterns if needed"
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Failed to add location {path} to library {library_id}: {e}")
+        return {
+            "error": str(e),
+            "library_id": library_id,
+            "path": path,
+            "suggestion": "Check library permissions and path accessibility"
+        }
+
+
+@mcp.tool()
+async def remove_library_location(library_id: str, path: str) -> dict:
+    """Remove an external folder path from an Immich library.
+
+    Clean up your library organization by removing folders that are no longer
+    needed. This helps maintain tidy library configurations.
+
+    Args:
+        library_id: The library ID to remove the location from
+        path: Full file system path to remove
+
+    Returns:
+        Updated library configuration without the removed location
+    """
+    try:
+        client = await get_api_client()
+
+        # Remove the location
+        result = await client.remove_library_location(library_id, path)
+
+        # Get updated library info
+        library_info = await client.get_library_info(library_id)
+
+        return {
+            "success": True,
+            "library_name": library_info.get("name", "Unknown"),
+            "removed_location": path,
+            "remaining_locations": len(library_info.get("importPaths", [])),
+            "result": result,
+            "message": f"Removed location '{path}' from library",
+            "warning": "Photos from this location may still exist in the library"
+        }
+    except Exception as e:
+        logger.error(f"Failed to remove location {path} from library {library_id}: {e}")
+        return {
+            "error": str(e),
+            "library_id": library_id,
+            "path": path,
+            "suggestion": "Verify the location exists in the library"
+        }
+
+
+@mcp.tool()
+async def manage_library(library_id: str, action: str,
+                        name: str | None = None,
+                        import_paths: list[str] | None = None,
+                        exclusion_patterns: list[str] | None = None) -> dict:
+    """Perform various management actions on an Immich library.
+
+    Comprehensive library management including updates, optimization, cleanup,
+    and maintenance operations. This provides the control needed for managing
+    external photo folder imports effectively.
+
+    Args:
+        library_id: The library ID to manage
+        action: Management action to perform:
+            - "update": Update library configuration
+            - "refresh": Refresh all metadata
+            - "optimize": Optimize database performance
+            - "empty_trash": Remove deleted items permanently
+            - "clean_bundles": Remove old bundle files to free space
+        name: New library name (for update action)
+        import_paths: Updated import paths (for update action)
+        exclusion_patterns: Updated exclusion patterns (for update action)
+
+    Returns:
+        Action results with status and any relevant statistics
+
+    Austrian efficiency: Complete library lifecycle management.
+    """
+    try:
+        client = await get_api_client()
+
+        # Get library info for context
+        library_info = await client.get_library_info(library_id)
+        library_name = library_info.get("name", "Unknown")
+
+        if action == "update":
+            if not any([name, import_paths, exclusion_patterns]):
+                return {
+                    "error": "Update action requires at least one parameter to change",
+                    "suggestion": "Provide name, import_paths, or exclusion_patterns"
+                }
+
+            result = await client.update_library(
+                library_id=library_id,
+                name=name,
+                import_paths=import_paths,
+                exclusion_patterns=exclusion_patterns
+            )
+            message = f"Updated library '{library_name}' configuration"
+
+        elif action == "refresh":
+            result = await client.refresh_library_metadata(library_id)
+            message = f"Refreshed metadata for library '{library_name}'"
+
+        elif action == "optimize":
+            result = await client.optimize_library(library_id)
+            message = f"Optimized database for library '{library_name}'"
+
+        elif action == "empty_trash":
+            result = await client.empty_library_trash(library_id)
+            message = f"Emptied trash for library '{library_name}'"
+
+        elif action == "clean_bundles":
+            result = await client.clean_library_bundles(library_id)
+            message = f"Cleaned bundles for library '{library_name}'"
+
+        else:
+            return {
+                "error": f"Unknown action: {action}",
+                "available_actions": ["update", "refresh", "optimize", "empty_trash", "clean_bundles"]
+            }
+
+        return {
+            "success": True,
+            "library_name": library_name,
+            "action": action,
+            "result": result,
+            "message": message,
+            "library_id": library_id
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to {action} library {library_id}: {e}")
+        return {
+            "error": str(e),
+            "library_id": library_id,
+            "action": action,
+            "suggestion": "Verify library exists and action is valid"
+        }
+
+
+# ===== MULTI-USER MANAGEMENT TOOLS =====
+
+@mcp.tool()
+async def list_users() -> dict:
+    """List all configured Immich users.
+
+    Shows all users configured in the system with their roles and descriptions.
+    Essential for managing multi-user Immich installations where different users
+    have different access levels and library permissions.
+
+    Returns:
+        Dictionary with user list and current active user information
+    """
+    global config
+    try:
+        if not config:
+            config = get_config()
+
+        users_info = []
+        for username, user in config.users.items():
+            users_info.append({
+                "name": user.name,
+                "role": user.role,
+                "description": user.description,
+                "is_active": username == config.active_user
+            })
+
+        return {
+            "success": True,
+            "users": users_info,
+            "active_user": config.active_user,
+            "total_users": len(config.users),
+            "message": f"Found {len(config.users)} configured users"
+        }
+    except Exception as e:
+        logger.error(f"Failed to list users: {e}")
+        return {
+            "error": str(e),
+            "suggestion": "Check user configuration in environment variables"
+        }
+
+
+@mcp.tool()
+async def switch_user(username: str) -> dict:
+    """Switch to a different Immich user context.
+
+    Changes the active user for all subsequent operations. This allows managing
+    multiple Immich accounts/libraries from a single MCP server instance.
+    Essential for multi-user Immich setups where you need to work with different
+    users' libraries and permissions.
+
+    Args:
+        username: Name of the user to switch to
+
+    Returns:
+        Confirmation of user switch with new active user information
+    """
+    global config, api_client
+    try:
+        if not config:
+            config = get_config()
+
+        # Switch user in config
+        new_user = config.switch_user(username)
+
+        # Update API client to use new user
+        if api_client:
+            api_client.switch_user(new_user)
+
+        return {
+            "success": True,
+            "switched_to_user": username,
+            "user_role": new_user.role,
+            "user_description": new_user.description,
+            "message": f"Successfully switched to user '{username}' ({new_user.role})",
+            "note": "All subsequent operations will use this user's permissions and libraries"
+        }
+    except Exception as e:
+        logger.error(f"Failed to switch to user {username}: {e}")
+        return {
+            "error": str(e),
+            "requested_user": username,
+            "suggestion": "Verify user exists in configuration"
+        }
+
+
+@mcp.tool()
+async def get_current_user() -> dict:
+    """Get information about the currently active Immich user.
+
+    Shows which user is currently active and their permissions. Useful for
+    understanding the current access context and available operations.
+
+    Returns:
+        Current user information and permissions
+    """
+    global config, api_client
+    try:
+        if not config:
+            config = get_config()
+
+        current_user = config.get_active_user()
+
+        # Get user-specific capabilities if API client is available
+        capabilities = {}
+        if api_client:
+            try:
+                # Try to get user capabilities (this might vary by Immich version)
+                capabilities["can_create_libraries"] = current_user.role in ["admin", "owner"]
+                capabilities["can_manage_users"] = current_user.role == "admin"
+                capabilities["can_delete_content"] = current_user.role in ["admin", "user"]
+            except Exception:
+                pass
+
+        return {
+            "success": True,
+            "current_user": current_user.name,
+            "role": current_user.role,
+            "description": current_user.description,
+            "capabilities": capabilities,
+            "message": f"Active user: {current_user.name} ({current_user.role})"
+        }
+    except Exception as e:
+        logger.error(f"Failed to get current user: {e}")
+        return {
+            "error": str(e),
+            "suggestion": "Check user configuration"
+        }
+
+
+@mcp.tool()
+async def get_user_libraries(username: str | None = None) -> dict:
+    """Get libraries accessible to a specific user or the current user.
+
+    Shows which libraries a user can access based on their permissions.
+    In multi-user Immich setups, different users may have access to different
+    libraries or shared libraries.
+
+    Args:
+        username: User to check libraries for (defaults to current user)
+
+    Returns:
+        List of accessible libraries for the specified user
+    """
+    global config, api_client
+    try:
+        if not config:
+            config = get_config()
+
+        target_user = username or config.active_user
+        if target_user != config.active_user:
+            # Temporarily switch to target user to get their libraries
+            original_user = config.get_active_user()
+            target_user_obj = config.users[target_user]
+            api_client.switch_user(target_user_obj)
+            libraries = await api_client.get_libraries()
+            # Switch back
+            api_client.switch_user(original_user)
+        else:
+            # Current user - just get libraries
+            libraries = await api_client.get_libraries()
+
+        return {
+            "success": True,
+            "user": target_user,
+            "libraries": libraries,
+            "library_count": len(libraries),
+            "message": f"User '{target_user}' has access to {len(libraries)} libraries"
+        }
+    except Exception as e:
+        logger.error(f"Failed to get libraries for user {username}: {e}")
+        return {
+            "error": str(e),
+            "user": username or "current",
+            "suggestion": "Verify user exists and has library access permissions"
+        }
+
+
 def main():
     """Main entry point for ImmichMCP server"""
     import argparse
@@ -2103,7 +2657,7 @@ def main():
         logger.info("Austrian efficiency for your 2000+ photo library!")
 
         # Run the FastMCP server in stdio mode
-        mcp.run()
+        mcp.run(log_level="INFO")
 
     elif args.transport == "http":
         import uvicorn

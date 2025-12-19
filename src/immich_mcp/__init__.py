@@ -2,7 +2,7 @@
 ImmichMCP - FastMCP 2.10 Server for Immich Photo Management
 
 Austrian efficiency for Sandra's 2000+ photo library management.
-Provides 15 tools: 5 core photo operations + 4 album management + 3 people/faces + 3 administration
+Provides 25+ tools: 5 core photo operations + 4 album management + 3 people/faces + 7 library management + 3 multi-user support + 3 administration
 """
 
 from .config import ImmichConfig, get_config

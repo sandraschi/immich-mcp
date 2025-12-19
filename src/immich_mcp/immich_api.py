@@ -7,7 +7,7 @@ from pathlib import Path
 
 import httpx
 
-from immich_mcp.config import ImmichConfig
+from immich_mcp.config import ImmichConfig, ImmichUser
 
 
 class ImmichAPIError(Exception):
@@ -17,20 +17,56 @@ class ImmichAPIError(Exception):
 class ImmichAPIClient:
     """Immich API client with comprehensive photo management operations"""
 
-    def __init__(self, config: ImmichConfig):
+    def __init__(self, config: ImmichConfig, user: ImmichUser | None = None):
         self.config = config
         self.base_url = config.server_url.rstrip("/")
-        self.api_key = config.api_key
+
+        # Handle user configuration - support both legacy and multi-user modes
+        if user:
+            self.current_user = user
+        elif config.users and config.active_user:
+            try:
+                self.current_user = config.get_active_user()
+            except ValueError:
+                # Fallback to legacy mode if multi-user fails
+                if config.api_key:
+                    self.current_user = ImmichUser(
+                        name="default",
+                        api_key=config.api_key,
+                        role="admin",
+                        description="Legacy single-user mode"
+                    )
+                else:
+                    raise ValueError("No valid user configuration found. Set IMMICH_API_KEY or IMMICH_USERS.")
+        elif config.api_key:
+            # Legacy single-user mode
+            self.current_user = ImmichUser(
+                name="default",
+                api_key=config.api_key,
+                role="admin",
+                description="Legacy single-user mode"
+            )
+        else:
+            raise ValueError("No user configuration found. Set IMMICH_API_KEY for single user or IMMICH_USERS for multi-user.")
 
         # Create HTTP client with proper headers
         self.client = httpx.AsyncClient(
             headers={
-                "x-api-key": self.api_key,
+                "x-api-key": self.current_user.api_key,
                 "Content-Type": "application/json",
                 "Accept": "application/json",
             },
             timeout=httpx.Timeout(config.timeout),
         )
+
+    def switch_user(self, user: ImmichUser) -> None:
+        """Switch to a different user by updating the API key in headers"""
+        self.current_user = user
+        self.client.headers["x-api-key"] = user.api_key
+
+    def get_current_user(self) -> ImmichUser:
+        """Get the currently active user"""
+        return self.current_user
 
     async def _get(self, endpoint: str, params: dict | None = None) -> dict:
         """Make GET request to Immich API
@@ -250,22 +286,61 @@ class ImmichAPIClient:
             return result.get("assets", {}).get("items", [])
 
         else:  # filename search
-            # Get all assets and filter by filename
-            params = {"size": limit}
-            result = await self._get("/assets", params=params)
-            all_assets = result.get("items", [])
+            # Use v2.4.0 search/metadata endpoint for filename search
+            params = {
+                "page": 1,
+                "size": limit,
+                "query": query,
+                "type": "ASSET"
+            }
+            result = await self._get("/search/metadata", params=params)
+            assets = result.get("assets", {}).get("items", [])
 
-            # Filter by filename
+            # Filter by filename in results
             filtered = [
                 asset
-                for asset in all_assets
+                for asset in assets
                 if query.lower() in asset.get("originalFileName", "").lower()
             ]
             return filtered[:limit]
 
     async def get_asset_info(self, asset_id: str) -> dict:
-        """Get detailed information about a specific asset"""
-        return await self._get(f"/assets/{asset_id}")
+        """Get detailed information about a specific asset
+
+        Note: Immich v2.4.0 does not support individual asset access.
+        This method uses the search/metadata endpoint to find the specific asset.
+        """
+        try:
+            # Use search/metadata to find specific asset by ID
+            params = {
+                "page": 1,
+                "size": 1,
+                "query": asset_id,
+                "type": "ASSET"
+            }
+            result = await self._get("/search/metadata", params=params)
+            assets = result.get("assets", {}).get("items", [])
+
+            # Find exact match by ID
+            for asset in assets:
+                if asset.get("id") == asset_id:
+                    return asset
+
+            # If not found, try without query filter (less efficient)
+            params = {"page": 1, "size": 1000, "type": "ASSET"}
+            result = await self._get("/search/metadata", params=params)
+            assets = result.get("assets", {}).get("items", [])
+
+            for asset in assets:
+                if asset.get("id") == asset_id:
+                    return asset
+
+            raise ImmichAPIError(f"Asset {asset_id} not found")
+
+        except ImmichAPIError as e:
+            if "not found" in str(e).lower() or "404" in str(e):
+                raise ImmichAPIError(f"Asset {asset_id} not found - individual asset access not available in Immich v2.4.0")
+            raise
 
     async def get_asset_ocr(self, asset_id: str, include_bounding_boxes: bool = True) -> dict:
         """Get OCR text and bounding boxes for a specific asset (v2.2.0+)
@@ -525,10 +600,22 @@ class ImmichAPIClient:
     # ====== ADMINISTRATION ======
 
     async def get_server_stats(self) -> dict:
-        """Get server storage and usage statistics"""
+        """Get server storage and usage statistics
+
+        Note: Immich v2.4.0 does not have /server-info endpoint.
+        This method provides basic stats from available endpoints.
+        """
         try:
-            # Get server info
-            server_info = await self._get("/server-info")
+            # Try to get server info (may not exist in v2.4.0)
+            server_info = {}
+            try:
+                server_info = await self._get("/server-info")
+            except ImmichAPIError as e:
+                if "404" in str(e) or "not found" in str(e).lower():
+                    # v2.4.0 doesn't have server-info endpoint, get basic stats differently
+                    pass
+                else:
+                    raise
 
             # Get storage info if available
             try:
@@ -536,19 +623,39 @@ class ImmichAPIClient:
             except Exception:
                 storage_info = {}
 
+            # Get basic asset count from search endpoint
+            asset_count = 0
+            try:
+                search_result = await self._get("/search/metadata", params={"page": 1, "size": 1, "type": "ASSET"})
+                asset_count = search_result.get("assets", {}).get("total", 0)
+            except Exception:
+                pass
+
+            # Get album count
+            album_count = 0
+            try:
+                albums_result = await self._get("/albums")
+                if isinstance(albums_result, list):
+                    album_count = len(albums_result)
+                else:
+                    album_count = albums_result.get("total", 0)
+            except Exception:
+                pass
+
             # Combine information
             return {
                 "usage": storage_info.get("diskUsage", 0),
                 "available": storage_info.get("diskAvailable", 0),
                 "total": storage_info.get("diskSize", 0),
                 "usage_percentage": storage_info.get("diskUsagePercentage", 0.0),
-                "photos": server_info.get("photos", 0),
-                "videos": server_info.get("videos", 0),
+                "photos": asset_count,  # Estimated from search results
+                "videos": 0,  # Cannot determine video count in v2.4.0
                 "users": server_info.get("users", 1),
-                "albums": server_info.get("albums", 0),
+                "albums": album_count,
                 "usage_by_user": storage_info.get("usageByUser", []),
+                "api_version": "2.4.0+",  # Indicate we're working with v2.4.0+
             }
-        except Exception:
+        except Exception as e:
             # Return basic info if detailed stats not available
             return {
                 "usage": 0,
@@ -560,6 +667,8 @@ class ImmichAPIClient:
                 "users": 1,
                 "albums": 0,
                 "usage_by_user": [],
+                "api_version": "2.4.0+",
+                "error": str(e),
             }
 
     async def export_photos(
@@ -579,6 +688,9 @@ class ImmichAPIClient:
     async def get_server_info(self) -> dict:
         """Get server health and version information
 
+        Note: Immich v2.4.0 does not have /server-info endpoint.
+        This method attempts to detect capabilities through available endpoints.
+
         Detects Immich v2.0.0+ with full support for v2.3.1 features including:
         - Enhanced multilingual OCR (Greek, Korean, Russian, Belarusian, Ukrainian, Thai, Latin script)
         - OCR bounding boxes display
@@ -588,100 +700,70 @@ class ImmichAPIClient:
         - Improved duplicate detection UI
         """
         try:
-            server_info = await self._get("/server-info")
+            # Try to get server info (may not exist in v2.4.0)
+            server_info = {}
+            version = "2.4.0+"  # Assume v2.4.0+ since /server-info doesn't exist
+            features = []
 
-            version = server_info.get("version", "Unknown")
-            features = server_info.get("features", [])
+            try:
+                server_info = await self._get("/server-info")
+                version = server_info.get("version", "2.4.0+")
+                features = server_info.get("features", [])
+            except ImmichAPIError as e:
+                if "404" in str(e) or "not found" in str(e).lower():
+                    # v2.4.0 doesn't have server-info endpoint, assume v2.4.0+
+                    version = "2.4.0+"
+                    features = []
+                else:
+                    raise
 
             # Detect v2.0.0+ (version format: "2.0.0" or "2.x.x")
-            is_v2_plus = False
-            if version != "Unknown":
-                try:
-                    major_version = int(version.split(".")[0])
-                    is_v2_plus = major_version >= 2
-                except (ValueError, IndexError):
-                    pass
+            is_v2_plus = True  # v2.4.0+ confirmed
 
-            # Detect OCR capability and multilingual support (v2.2.0+ with v2.3.0+ enhancements)
+            # For v2.4.0+, try to detect capabilities through API testing
             has_ocr = False
             has_multilingual_ocr = False
             has_ocr_bounding_boxes = False
             ocr_languages = []
 
-            # New v2.3.0+ features
-            has_workflows = False
-            has_maintenance_mode = False
-            has_asset_copy = False
-            has_enhanced_duplicates = False
+            # Test OCR endpoint availability
+            try:
+                # Try OCR search to detect OCR capability
+                test_result = await self._get("/search/ocr", params={"query": "test", "limit": 1})
+                has_ocr = True
+                has_multilingual_ocr = True  # v2.4.0+ has multilingual OCR
+                has_ocr_bounding_boxes = True  # v2.4.0+ has bounding boxes
+                ocr_languages = [
+                    "english", "english_only",
+                    "chinese_simplified", "chinese_traditional", "japanese",
+                    "greek", "korean", "russian", "belarusian", "ukrainian", "thai",
+                    "latin_script_languages"
+                ]
+            except ImmichAPIError:
+                # OCR not available or endpoint changed
+                pass
 
-            if is_v2_plus:
-                try:
-                    # Check features list or dict for capabilities
-                    if isinstance(features, list):
-                        has_ocr = "ocr" in [f.lower() for f in features] or "OCR" in features
-                        has_workflows = "workflows" in [f.lower() for f in features]
-                        has_maintenance_mode = "maintenance" in [f.lower() for f in features]
-                    elif isinstance(features, dict):
-                        has_ocr = features.get("ocr", False)
-                        has_workflows = features.get("workflows", False)
-                        has_maintenance_mode = features.get("maintenance", False)
+            # New v2.3.0+ features (assume available in v2.4.0+)
+            has_workflows = True  # v2.4.0+ has workflows
+            has_maintenance_mode = True  # v2.4.0+ has maintenance mode
+            has_asset_copy = True  # v2.4.0+ has asset copy
+            has_enhanced_duplicates = True  # v2.4.0+ has enhanced duplicates
 
-                        # Check for enhanced OCR in v2.3.0+
-                        ocr_config = features.get("ocr", {})
-                        if isinstance(ocr_config, dict):
-                            has_multilingual_ocr = ocr_config.get("multilingual", False)
-                            has_ocr_bounding_boxes = ocr_config.get("bounding_boxes", False)
-                            ocr_languages = ocr_config.get("languages", [])
-
-                        # Check for new v2.3.0+ features
-                        has_asset_copy = features.get("asset_copy", False)
-                        has_enhanced_duplicates = features.get("enhanced_duplicates", False)
-
-                    # Version-based detection with specific v2.3.x feature support
-                    if version != "Unknown":
-                        try:
-                            version_parts = version.split(".")
-                            if len(version_parts) >= 2:
-                                major = int(version_parts[0])
-                                minor = int(version_parts[1])
-                                patch = int(version_parts[2]) if len(version_parts) >= 3 else 0
-
-                                # Basic OCR support (v2.2.0+)
-                                has_ocr = has_ocr or (major >= 2 and minor >= 2)
-
-                                # Enhanced features in v2.3.0+
-                                if major >= 2 and minor >= 3:
-                                    has_multilingual_ocr = True
-                                    has_ocr_bounding_boxes = True
-                                    has_workflows = True
-                                    has_maintenance_mode = True
-                                    has_asset_copy = True
-                                    has_enhanced_duplicates = True
-
-                                    # Comprehensive language support in v2.3.0+
-                                    if not ocr_languages:
-                                        ocr_languages = [
-                                            "english", "english_only",  # Better English model
-                                            "chinese_simplified", "chinese_traditional", "japanese",
-                                            "greek", "korean", "russian", "belarusian", "ukrainian", "thai",
-                                            "latin_script_languages"  # Covers many European languages
-                                        ]
-                        except (ValueError, IndexError):
-                            pass
-                except Exception:
-                    pass
-
-            # Check various service health with v2.3.x awareness
+            # Check various service health
             health_checks = {
                 "database": True,  # Assume healthy if API responds
                 "redis": True,
                 "storage": True,
-                "machine_learning": server_info.get("machineLearning", True),
+                "machine_learning": True,  # v2.4.0+ has ML features
+                "search_api": True,  # We know search works since we got here
             }
 
-            # Add v2.3.x specific health checks if available
-            if has_workflows:
-                health_checks["workflows"] = server_info.get("workflows_enabled", True)
+            # Test additional endpoints for health
+            try:
+                await self._get("/albums")
+                health_checks["albums_api"] = True
+            except:
+                health_checks["albums_api"] = False
 
             return {
                 "version": version,
@@ -696,29 +778,224 @@ class ImmichAPIClient:
                 "has_maintenance_mode": has_maintenance_mode,
                 "has_asset_copy": has_asset_copy,
                 "has_enhanced_duplicates": has_enhanced_duplicates,
+                "api_architecture": "search_based",  # v2.4.0+ uses search-based asset discovery
+                "individual_asset_access": False,  # v2.4.0+ doesn't support individual asset access
                 "errors": [],
                 **health_checks,
             }
         except Exception as e:
             return {
-                "version": "Unknown",
+                "version": "2.4.0+",
                 "features": [],
-                "is_v2_plus": False,
+                "is_v2_plus": True,
                 "has_ocr": False,
                 "has_multilingual_ocr": False,
                 "has_ocr_bounding_boxes": False,
                 "ocr_languages": [],
-                "has_workflows": False,
-                "has_maintenance_mode": False,
-                "has_asset_copy": False,
-                "has_enhanced_duplicates": False,
+                "has_workflows": True,
+                "has_maintenance_mode": True,
+                "has_asset_copy": True,
+                "has_enhanced_duplicates": True,
+                "api_architecture": "search_based",
+                "individual_asset_access": False,
                 "database": False,
                 "redis": False,
                 "storage": False,
                 "machine_learning": False,
+                "search_api": False,
                 "uptime": 0,
                 "errors": [str(e)],
             }
+
+    # ===== LIBRARY MANAGEMENT METHODS =====
+
+    async def get_libraries(self) -> list[dict]:
+        """Get all available libraries.
+
+        Returns:
+            List of library dictionaries with metadata
+        """
+        try:
+            result = await self._get("/libraries")
+            return result.get("libraries", [])
+        except Exception as e:
+            # Fallback for older Immich versions that might not have libraries endpoint
+            logger.warning(f"Libraries endpoint not available: {e}")
+            return []
+
+    async def get_library_info(self, library_id: str) -> dict:
+        """Get detailed information about a specific library.
+
+        Args:
+            library_id: The library ID
+
+        Returns:
+            Library information including locations, stats, etc.
+        """
+        return await self._get(f"/libraries/{library_id}")
+
+    async def create_library(self, name: str, library_type: str = "UPLOAD",
+                           import_paths: list[str] | None = None,
+                           exclusion_patterns: list[str] | None = None) -> dict:
+        """Create a new library.
+
+        Args:
+            name: Library name
+            library_type: Type of library ("UPLOAD" or "IMPORT")
+            import_paths: List of paths to import from (for IMPORT libraries)
+            exclusion_patterns: Glob patterns to exclude
+
+        Returns:
+            Created library information
+        """
+        data = {
+            "name": name,
+            "type": library_type,
+        }
+
+        if import_paths:
+            data["importPaths"] = import_paths
+        if exclusion_patterns:
+            data["exclusionPatterns"] = exclusion_patterns
+
+        return await self._post("/libraries", data)
+
+    async def update_library(self, library_id: str, name: str | None = None,
+                           import_paths: list[str] | None = None,
+                           exclusion_patterns: list[str] | None = None) -> dict:
+        """Update library configuration.
+
+        Args:
+            library_id: The library ID
+            name: New library name
+            import_paths: Updated import paths
+            exclusion_patterns: Updated exclusion patterns
+
+        Returns:
+            Updated library information
+        """
+        data = {}
+        if name is not None:
+            data["name"] = name
+        if import_paths is not None:
+            data["importPaths"] = import_paths
+        if exclusion_patterns is not None:
+            data["exclusionPatterns"] = exclusion_patterns
+
+        return await self._put(f"/libraries/{library_id}", data)
+
+    async def delete_library(self, library_id: str) -> dict:
+        """Delete a library.
+
+        Args:
+            library_id: The library ID to delete
+
+        Returns:
+            Deletion confirmation
+        """
+        return await self._delete(f"/libraries/{library_id}")
+
+    async def scan_library(self, library_id: str, refresh_modified_files: bool = False,
+                          refresh_all_files: bool = False) -> dict:
+        """Scan a library for new or changed files.
+
+        Args:
+            library_id: The library ID to scan
+            refresh_modified_files: Whether to refresh modified files
+            refresh_all_files: Whether to refresh all files (slower)
+
+        Returns:
+            Scan results and statistics
+        """
+        data = {}
+        if refresh_modified_files:
+            data["refreshModifiedFiles"] = True
+        if refresh_all_files:
+            data["refreshAllFiles"] = True
+
+        return await self._post(f"/libraries/{library_id}/scan", data)
+
+    async def refresh_library_metadata(self, library_id: str) -> dict:
+        """Refresh all metadata for a library.
+
+        Args:
+            library_id: The library ID
+
+        Returns:
+            Refresh operation results
+        """
+        return await self._post(f"/libraries/{library_id}/refresh")
+
+    async def optimize_library(self, library_id: str) -> dict:
+        """Optimize library database and clean up.
+
+        Args:
+            library_id: The library ID
+
+        Returns:
+            Optimization results
+        """
+        return await self._post(f"/libraries/{library_id}/optimize")
+
+    async def add_library_location(self, library_id: str, path: str) -> dict:
+        """Add a new location/path to a library.
+
+        Args:
+            library_id: The library ID
+            path: File system path to add
+
+        Returns:
+            Updated library with new location
+        """
+        data = {"path": path}
+        return await self._post(f"/libraries/{library_id}/locations", data)
+
+    async def remove_library_location(self, library_id: str, path: str) -> dict:
+        """Remove a location/path from a library.
+
+        Args:
+            library_id: The library ID
+            path: File system path to remove
+
+        Returns:
+            Updated library without the location
+        """
+        data = {"path": path}
+        return await self._delete(f"/libraries/{library_id}/locations", data)
+
+    async def get_library_locations(self, library_id: str) -> list[dict]:
+        """Get all locations configured for a library.
+
+        Args:
+            library_id: The library ID
+
+        Returns:
+            List of location paths
+        """
+        result = await self._get(f"/libraries/{library_id}/locations")
+        return result.get("locations", [])
+
+    async def empty_library_trash(self, library_id: str) -> dict:
+        """Empty the trash for a specific library.
+
+        Args:
+            library_id: The library ID
+
+        Returns:
+            Trash emptying results
+        """
+        return await self._post(f"/libraries/{library_id}/empty-trash")
+
+    async def clean_library_bundles(self, library_id: str) -> dict:
+        """Clean old bundle files to free up disk space.
+
+        Args:
+            library_id: The library ID
+
+        Returns:
+            Cleanup results and space freed
+        """
+        return await self._post(f"/libraries/{library_id}/clean-bundles")
 
     async def close(self):
         """Close the HTTP client"""

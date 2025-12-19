@@ -1,0 +1,150 @@
+{
+  "summary": {
+    "total_tests": 13,
+    "passed": 5,
+    "failed": 8,
+    "skipped": 0,
+    "duration": 0.2745349407196045
+  },
+  "tests": [
+    {
+      "name": "basic_connectivity",
+      "status": "PASS",
+      "passed": true,
+      "message": "Connected to Immich 2.4.0+",
+      "details": {
+        "server_info": {
+          "version": "2.4.0+",
+          "features": [],
+          "uptime": 0,
+          "is_v2_plus": true,
+          "has_ocr": false,
+          "has_multilingual_ocr": false,
+          "has_ocr_bounding_boxes": false,
+          "ocr_languages": [],
+          "has_workflows": true,
+          "has_maintenance_mode": true,
+          "has_asset_copy": true,
+          "has_enhanced_duplicates": true,
+          "api_architecture": "search_based",
+          "individual_asset_access": false,
+          "errors": [],
+          "database": true,
+          "redis": true,
+          "storage": true,
+          "machine_learning": true,
+          "search_api": true,
+          "albums_api": false
+        }
+      }
+    },
+    {
+      "name": "search_metadata_endpoint",
+      "status": "FAIL",
+      "passed": false,
+      "message": "Search endpoint failed: GET /search/metadata failed - HTTP 404: Cannot GET /api/search/metadata?page=1&size=10&type=ASSET",
+      "details": {}
+    },
+    {
+      "name": "smart_search",
+      "status": "FAIL",
+      "passed": false,
+      "message": "Smart search failed: GET /search/smart failed - HTTP 404: Cannot GET /api/search/smart?query=test&limit=5&type=SMART_SEARCH",
+      "details": {}
+    },
+    {
+      "name": "filename_search",
+      "status": "FAIL",
+      "passed": false,
+      "message": "Filename search failed: GET /search/metadata failed - HTTP 404: Cannot GET /api/search/metadata?page=1&size=5&query=&type=ASSET",
+      "details": {}
+    },
+    {
+      "name": "individual_asset_access",
+      "status": "FAIL",
+      "passed": false,
+      "message": "Asset access test failed: GET /search/metadata failed - HTTP 404: Cannot GET /api/search/metadata?page=1&size=1&query=&type=ASSET",
+      "details": {}
+    },
+    {
+      "name": "asset_info_fallback",
+      "status": "FAIL",
+      "passed": false,
+      "message": "Asset info fallback failed: GET /search/metadata failed - HTTP 404: Cannot GET /api/search/metadata?page=1&size=1&query=&type=ASSET",
+      "details": {}
+    },
+    {
+      "name": "server_info_adaptation",
+      "status": "PASS",
+      "passed": true,
+      "message": "All server info checks passed (4/4)",
+      "details": {}
+    },
+    {
+      "name": "server_stats_adaptation",
+      "status": "PASS",
+      "passed": true,
+      "message": "Server stats adapted for v2.4.0",
+      "details": {}
+    },
+    {
+      "name": "albums_api_compatibility",
+      "status": "FAIL",
+      "passed": false,
+      "message": "Albums API failed: GET /albums failed - HTTP 401: Invalid API key",
+      "details": {}
+    },
+    {
+      "name": "album_creation_compatibility",
+      "status": "FAIL",
+      "passed": false,
+      "message": "Album creation failed: POST /albums failed - HTTP 401: Invalid API key",
+      "details": {}
+    },
+    {
+      "name": "ocr_detection",
+      "status": "PASS",
+      "passed": true,
+      "message": "OCR correctly detected as unavailable",
+      "details": {}
+    },
+    {
+      "name": "search_performance",
+      "status": "FAIL",
+      "passed": false,
+      "message": "Performance test failed: GET /search/metadata failed - HTTP 404: Cannot GET /api/search/metadata?page=1&size=50&query=&type=ASSET",
+      "details": {}
+    },
+    {
+      "name": "invalid_asset_handling",
+      "status": "PASS",
+      "passed": true,
+      "message": "Invalid asset ID correctly handled",
+      "details": {}
+    }
+  ],
+  "server_info": {
+    "version": "2.4.0+",
+    "features": [],
+    "uptime": 0,
+    "is_v2_plus": true,
+    "has_ocr": false,
+    "has_multilingual_ocr": false,
+    "has_ocr_bounding_boxes": false,
+    "ocr_languages": [],
+    "has_workflows": true,
+    "has_maintenance_mode": true,
+    "has_asset_copy": true,
+    "has_enhanced_duplicates": true,
+    "api_architecture": "search_based",
+    "individual_asset_access": false,
+    "errors": [],
+    "database": true,
+    "redis": true,
+    "storage": true,
+    "machine_learning": true,
+    "search_api": true,
+    "albums_api": false
+  },
+  "compatibility_score": 38.46153846153847
+}

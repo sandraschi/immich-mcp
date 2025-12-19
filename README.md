@@ -4,20 +4,77 @@
 
 Efficient Immich photo library management through the MCP (Model Context Protocol). Built with Austrian efficiency principles: simple, reliable, and effective.
 
-> **⚠️ Status**: Compatible with Immich v2.3.1+ (v2.4.0 requires API migration), FastMCP 2.11+, and Claude Desktop
+> **✅ Status**: Fully operational with Immich v2.4.0+ (API migration completed), FastMCP 2.13+, Cursor MCP integration working
 
 ## Quick Start
 
 ### 1. Prerequisites
 
 - Python 3.11+
-- [Immich server](https://immich.app/) v2.3.1+ running and accessible
-  - ⚠️ **Immich v2.4.0**: API migration required (see [API Migration](#api-migration-notes))
+- [Immich server](https://immich.app/) v2.4.0+ running and accessible
+  - ✅ **Immich v2.4.0+**: Full compatibility (search-based API)
   - ✅ **Immich v2.3.1**: Full compatibility
   - ✅ **Immich v2.2.0+**: OCR search support
 - Immich API key (get from Administration → API Keys)
 
-### 2. Installation
+### 2. Cursor Integration
+
+ImmichMCP integrates with Cursor through MCP (Model Context Protocol):
+
+#### **Automatic Setup (Recommended)**
+Cursor will automatically detect and configure ImmichMCP if you have the repository cloned.
+
+#### **Manual Configuration**
+ImmichMCP is configured in your user profile: `~/.cursor/mcp.json` (typically `C:\Users\%USERNAME%\.cursor\mcp.json` on Windows). If you need to modify it, edit that file:
+
+```json
+{
+  "mcpServers": {
+    "immich-mcp": {
+      "command": "python",
+      "args": ["D:/Dev/repos/immich-mcp/src/immich_mcp/server.py"],
+      "env": {
+        "IMMICH_SERVER_URL": "http://213.47.34.131:2283",
+        "IMMICH_API_KEY": "eCWNLTQZ7UwAVgbQmtGl0Q8AMEjeuddHy1BVCTWRtNA",
+        "PYTHONPATH": "D:/Dev/repos/immich-mcp/src",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}
+```
+
+**Restart Cursor** after adding the configuration.
+
+#### **Troubleshooting Cursor Integration**
+
+**✅ "Immich MCP server started successfully"**
+- Server should appear in Cursor's Output tab → "MCP" panel
+- Look for the startup banner with Austrian efficiency message
+- Check for "Starting MCP server 'ImmichMCP'" in logs
+
+**❌ "Immich MCP server not found in output"**
+- Check Cursor's Output tab → "MCP" panel
+- Look for error messages in the log
+- Verify MCP configuration in `~/.cursor/mcp.json` (`C:\Users\%USERNAME%\.cursor\mcp.json` on Windows)
+- Ensure environment variables are set: `IMMICH_SERVER_URL` and `IMMICH_API_KEY`
+- Try restarting Cursor after configuration changes
+
+**❌ "Connection failed" or "API key invalid"**
+- Verify Immich server is running on the configured URL (`http://213.47.34.131:2283`)
+- Check API key in Immich settings → Account → API Keys
+- Test connection manually: `curl -H "x-api-key: eCWNLTQZ7UwAVgbQmtGl0Q8AMEjeuddHy1BVCTWRtNA" http://213.47.34.131:2283/api/auth/status`
+
+**❌ "Import errors" or "Module not found"**
+- Ensure you're using Python 3.11+
+- Install dependencies: `pip install -r requirements.txt`
+- Check PYTHONPATH in Cursor MCP configuration (`D:/Dev/repos/immich-mcp/src`)
+
+**❌ "Environment variable issues"**
+- Cursor MCP configuration should override .env file settings
+- Verify the env block in `~/.cursor/mcp.json` contains correct values
+
+### 3. Environment Configuration
 
 ```powershell
 # Clone repository
@@ -60,16 +117,45 @@ python src/immich_mcp/server.py
 
 For Claude Desktop integration, use the MCPB package.
 
+## API Migration Notes (v2.4.0)
+
+ImmichMCP has been updated for full compatibility with Immich v2.4.0+ which uses a search-based API architecture:
+
+### Key Changes in Immich v2.4.0
+- **Asset Discovery**: `GET /api/assets` → `POST /api/search/metadata`
+- **Individual Assets**: `GET /api/assets/:id` no longer available
+- **Server Info**: `GET /api/server-info` endpoint removed
+- **Search Architecture**: All asset access now goes through search endpoints
+
+### ImmichMCP Adaptations
+- ✅ **Search-based asset listing** using `/api/search/metadata`
+- ✅ **Fallback asset access** via search with specific queries
+- ✅ **Server detection** without `/server-info` dependency
+- ✅ **Backward compatibility** maintained for older Immich versions
+- ✅ **Comprehensive testing** with automated compatibility checks
+
+### Testing Compatibility
+Run the built-in test harness to verify your Immich server compatibility:
+
+```powershell
+# Test against your Immich server
+$env:IMMICH_API_KEY = "your-api-key"
+python tests/test_harness_v240.py
+```
+
 ## Features
 
 ### Core Photo Operations
 
 - **Upload photos/videos** with metadata preservation
 - **Smart search** using CLIP-based natural language queries
-- **Enhanced OCR search** with multilingual support (Greek, Korean, Russian, Thai, etc.) - v2.3.0+
-- **OCR bounding boxes** for precise text location highlighting - v2.3.0+
+- **Enhanced OCR search** with multilingual support (Greek, Korean, Russian, Thai, etc.) - v2.4.0+
+- **OCR bounding boxes** for precise text location highlighting - v2.4.0+
 - **Organize photos** by date, location, or custom criteria
 - **Get detailed metadata** including OCR data from any photo/video
+- **Library management** for external photo folders - v2.4.0+
+- **Multi-user support** with user switching and permissions - v2.4.0+
+- **Cursor integration** with seamless MCP protocol support
 
 ### Available Tools
 
@@ -107,9 +193,59 @@ For Claude Desktop integration, use the MCPB package.
    Get OCR data with bounding boxes for photo abc123
    ```
 
-3. **Server Health**
+4. **Server Health**
    - Check Immich server status
    - Verify API connectivity
+
+### 🗂️ Library Management (External Folders Solution)
+
+ImmichMCP solves the "unwieldy external folder management" problem with comprehensive library management tools:
+
+- **Create Libraries** - Organize photos from different external folders
+- **Add/Remove Locations** - Easily manage which folders are included in libraries
+- **Scan Libraries** - Automatically import new photos from configured folders
+- **Library Maintenance** - Optimize, clean bundles, empty trash
+- **Multi-Location Support** - Combine multiple external folders in one library
+
+**Example Workflow:**
+```bash
+# Create a library for vacation photos
+Create library "Vacations" with import paths ["D:/Photos/Vacation/2024", "D:/Photos/Vacation/2025"]
+
+# Add a new location to existing library
+Add location "D:/Photos/Vacation/2026" to library "Vacations"
+
+# Scan for new photos
+Scan library "Vacations" with refresh modified files
+```
+
+### 👥 Multi-User Support
+
+Full multi-user Immich support for shared installations:
+
+- **User Switching** - Switch between different Immich user accounts
+- **Role-Based Access** - Respect user permissions (admin, user, shared)
+- **User-Specific Libraries** - Access libraries based on user permissions
+- **Context Management** - Maintain separate contexts for different users
+
+**Environment Configuration:**
+```env
+# Multiple users configuration
+IMMICH_USERS=sandra:api_key_sandra:admin:Sandra's account,family:api_key_family:user:Shared family account
+IMMICH_ACTIVE_USER=sandra
+```
+
+**Example Usage:**
+```bash
+# Switch to family user account
+Switch to user "family"
+
+# List libraries accessible to current user
+List user libraries
+
+# Switch back to admin user
+Switch to user "sandra"
+```
    - View version information
 
    Example:

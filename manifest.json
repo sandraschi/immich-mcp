@@ -1,8 +1,8 @@
 {
   "manifest_version": "0.2",
   "name": "immich-mcp",
-  "version": "1.1.0",
-  "description": "Austrian efficiency for Immich photo management with FastMCP 2.11+. Search photos with natural language or OCR text in 12+ languages. Manage your 2000+ photo library with v2.3.1+ compatibility.",
+  "version": "1.2.0",
+  "description": "Austrian efficiency for Immich photo management with FastMCP 2.11+. 25+ tools including library management (external folders), multi-user support, and v2.4.0+ compatibility. Search photos with AI, OCR in 12+ languages.",
   "author": {
     "name": "sandraschi",
     "email": "sandra@example.com"
@@ -86,28 +86,91 @@
     {
       "name": "server_health",
       "description": "Check Immich server health and connection status"
+    },
+    {
+      "name": "list_libraries",
+      "description": "List all Immich libraries for external folder management"
+    },
+    {
+      "name": "get_library_info",
+      "description": "Get detailed information about a specific Immich library"
+    },
+    {
+      "name": "create_library",
+      "description": "Create a new library for organizing external photo folders"
+    },
+    {
+      "name": "scan_library",
+      "description": "Scan library for new photos from external folders"
+    },
+    {
+      "name": "add_library_location",
+      "description": "Add external folder path to an Immich library"
+    },
+    {
+      "name": "remove_library_location",
+      "description": "Remove external folder path from library"
+    },
+    {
+      "name": "manage_library",
+      "description": "Perform maintenance operations on libraries (optimize, refresh, clean)"
+    },
+    {
+      "name": "list_users",
+      "description": "List all configured Immich users for multi-user support"
+    },
+    {
+      "name": "switch_user",
+      "description": "Switch between different Immich user accounts"
+    },
+    {
+      "name": "get_current_user",
+      "description": "Get information about the currently active user"
+    },
+    {
+      "name": "get_user_libraries",
+      "description": "Get libraries accessible to a specific user"
     }
   ],
   "user_config": {
-    "immich_url": {
+    "immich_server_url": {
       "type": "string",
       "title": "Immich Server URL",
       "description": "The base URL of your Immich server (e.g., http://localhost:2283 or https://immich.example.com)",
       "required": true,
-      "default": "http://localhost:2283"
+      "default": "http://localhost:2283",
+      "env_var": "IMMICH_SERVER_URL"
     },
     "immich_api_key": {
       "type": "string",
-      "title": "Immich API Key",
-      "description": "Your Immich API key (found in Immich settings under 'Account')",
-      "required": true,
-      "sensitive": true
+      "title": "Immich API Key (Legacy)",
+      "description": "Single-user API key for backward compatibility. For multi-user setup, use IMMICH_USERS instead.",
+      "required": false,
+      "sensitive": true,
+      "env_var": "IMMICH_API_KEY"
+    },
+    "immich_users": {
+      "type": "string",
+      "title": "Multi-User Configuration",
+      "description": "Multi-user setup: 'user1:key1:role1,user2:key2:role2'. Example: 'admin:abc123:admin,family:def456:user'",
+      "required": false,
+      "sensitive": true,
+      "env_var": "IMMICH_USERS"
+    },
+    "immich_active_user": {
+      "type": "string",
+      "title": "Active User",
+      "description": "Which user to use by default (must match a user in IMMICH_USERS)",
+      "required": false,
+      "default": "",
+      "env_var": "IMMICH_ACTIVE_USER"
     },
     "log_level": {
       "type": "string",
       "title": "Logging Level",
       "description": "Logging verbosity level (debug, info, warning, error, critical)",
-      "default": "info"
+      "default": "info",
+      "env_var": "LOG_LEVEL"
     }
   },
   "compatibility": {
