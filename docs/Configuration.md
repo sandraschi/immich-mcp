@@ -168,6 +168,59 @@ immich:
     bulk_operations: true
 ```
 
+### LLM Configuration for Enhanced AI Features
+
+Immich supports multiple LLM providers for advanced AI capabilities. Configure your preferred LLM for enhanced photo management:
+
+#### **LLM Provider Configuration**
+
+```yaml
+immich:
+  llm:
+    enabled: true
+    provider: "ollama"  # Options: ollama, openai, anthropic, local
+    model: "llama3.2:3b"
+    api_key: "${LLM_API_KEY}"  # For cloud providers
+    base_url: "http://localhost:11434"  # For Ollama/local
+    temperature: 0.7
+    max_tokens: 1000
+```
+
+#### **Environment Variables**
+
+```bash
+# LLM Configuration
+IMMICH_LLM_ENABLED=true
+IMMICH_LLM_PROVIDER=ollama
+IMMICH_LLM_MODEL=llama3.2:3b
+IMMICH_LLM_API_KEY=your_api_key_here  # For OpenAI/Anthropic
+IMMICH_LLM_BASE_URL=http://localhost:11434  # For Ollama/local
+IMMICH_LLM_TEMPERATURE=0.7
+IMMICH_LLM_MAX_TOKENS=1000
+```
+
+#### **LLM Features**
+
+- **Smart Search**: Natural language photo queries
+- **Object Detection**: AI-powered scene recognition
+- **Face Recognition**: Enhanced face detection and naming
+- **Auto-tagging**: Intelligent photo categorization
+- **OCR Enhancement**: Improved text extraction
+- **Content Analysis**: Deep photo content understanding
+
+#### **Performance Tuning**
+
+```yaml
+immich:
+  llm:
+    # Performance settings
+    batch_size: 10  # Photos to process simultaneously
+    timeout: 30     # LLM request timeout (seconds)
+    retry_count: 3  # Retry failed requests
+    cache_enabled: true
+    cache_ttl: 3600 # Cache results for 1 hour
+```
+
 ## Security Configuration
 
 ### SSL/TLS Setup

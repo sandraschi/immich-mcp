@@ -17,7 +17,61 @@ Efficient Immich photo library management through the MCP (Model Context Protoco
   - ✅ **Immich v2.2.0+**: OCR search support
 - Immich API key (get from Administration → API Keys)
 
-### 2. Cursor Integration
+### 2. LLM Configuration for Enhanced AI Features
+
+Immich supports multiple LLM providers for advanced AI capabilities including smart search, object detection, face recognition, and automatic tagging. Configure your preferred LLM for enhanced photo management:
+
+#### **Supported LLM Providers**
+
+- **OpenAI** (GPT-4, GPT-3.5-turbo)
+- **Anthropic** (Claude-3, Claude-2)
+- **Ollama** (Local models: Llama, Mistral, etc.)
+- **Local AI** (Custom local LLM servers)
+
+#### **LLM Configuration in Immich**
+
+Configure LLM settings in Immich Administration → Settings → Machine Learning:
+
+```yaml
+# Example LLM configuration
+machine_learning:
+  enabled: true
+  url: "http://localhost:11434"  # Ollama default
+  model: "llama3.2:3b"           # Ollama model name
+  api_key: "your-api-key"        # For cloud providers
+```
+
+#### **Environment Variables for ImmichMCP**
+
+For ImmichMCP to leverage LLM-enhanced features, ensure your Immich server has LLM configured:
+
+```bash
+# Required for LLM features
+IMMICH_LLM_ENABLED=true
+IMMICH_LLM_PROVIDER=ollama  # or openai, anthropic
+IMMICH_LLM_MODEL=llama3.2:3b
+IMMICH_LLM_API_KEY=your_key_here  # if using cloud provider
+```
+
+#### **Enhanced AI Features with LLM**
+
+- **Smart Search**: Natural language photo search ("find photos of my dog playing")
+- **Object Detection**: Automatic object and scene recognition
+- **Face Recognition**: AI-powered face detection and naming
+- **Auto-tagging**: Intelligent photo categorization
+- **OCR Enhancement**: Improved text extraction from images
+- **Content Analysis**: Deep understanding of photo content
+
+#### **LLM Performance Tips**
+
+- **Local Models (Ollama)**: Best for privacy, works offline
+- **Cloud Models**: Higher accuracy, requires API key
+- **Model Size**: Larger models = better results but slower processing
+- **Batch Processing**: Enable for bulk photo analysis
+
+> **Note**: LLM features require Immich server v2.2.0+ with machine learning enabled. Some features may require additional hardware resources.
+
+### 4. Cursor Integration
 
 ImmichMCP integrates with Cursor through MCP (Model Context Protocol):
 
@@ -74,7 +128,7 @@ ImmichMCP is configured in your user profile: `~/.cursor/mcp.json` (typically `C
 - Cursor MCP configuration should override .env file settings
 - Verify the env block in `~/.cursor/mcp.json` contains correct values
 
-### 3. Environment Configuration
+### 4. Environment Configuration
 
 ```powershell
 # Clone repository
@@ -93,7 +147,7 @@ Copy-Item .env.example .env -Force
 # Edit .env with your Immich URL and API key
 ```
 
-### 3. Configuration
+### 5. Configuration
 
 Edit `.env` file with your Immich server details:
 
@@ -106,7 +160,7 @@ IMMICH_URL=http://localhost:2283
 LOG_LEVEL=INFO
 ```
 
-### 4. Run Server
+### 6. Run Server
 
 For development and testing:
 
