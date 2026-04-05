@@ -1,0 +1,36 @@
+# immich-mcp
+> > **Purpose**: Comprehensive GitHub configuration guide to avoid hours of trial-and-error setup. > > **Copy this to new MCP repos** to get everything right the first time! --- 1. [Quick Setup Checklis...
+
+This project includes automated llms.txt generation for AI accessibility.
+
+## Docs
+- [Readme](docs\github\README.md): > **Purpose**: Comprehensive GitHub configuration guide to avoid hours of trial-and-error setup.
+- [Readme](docs\repository-protection\README.md): **Complete guide to keeping your notepadpp-mcp repository safe**
+- [Readme](docs\development\README.md): **Guides, best practices, and lessons learned for developing notepadpp-mcp**
+- [Readme](README.md): **FastMCP 2.14.3+** | **Austrian Efficiency** | **Conversational AI & Sampling**
+- [Readme](docs\notepadpp\README.md): **Everything you need to know about Notepad++ - from history to advanced usage**
+- [Readme](docs\glama-platform\README.md): **Complete guide to achieving and maintaining Gold Status on Glama.ai**
+- [Test Readme](TEST_README.md): **Comprehensive testing framework for Immich MCP server functionality.**
+- [Readme](docs\mcpb-packaging\README.md): **Complete guide to packaging and distributing MCP servers with MCPB**
+- [Readme](docs\glama\README.md): This directory contains documentation related to achieving GLAMA AI Gold standard status for the Adv...
+- [Readme](docs\mcp-technical\README.md): **Technical guides for MCP server development, deployment, and troubleshooting**
+
+## Api
+- [  Init  ](src\immich_mcp\api\v1\__init__.py): Api definitions and implementations
+- [Routes](src\immich_mcp\api\v1\routes.py): Api definitions and implementations
+- [Immich Api](src\immich_mcp\immich_api.py): Api definitions and implementations
+- [Routes](src\immich_mcp\api\v1\routes.py): Routes definitions and implementations
+
+## Examples
+- [Examples](examples/): Example code and implementations
+- [Comprehensive Demo](comprehensive_demo.py): Demo usage and code samples
+
+## Configuration
+- [Pyproject](pyproject.toml): Python project configuration and dependencies
+- [Package](web_sota\package.json): Node.js project configuration and dependencies
+- [](.env): Environment variables and configuration
+- [Config](.git\config): Application configuration files
+
+## Optional
+- [Changelog](CHANGELOG.md): Project changelog information
+- [License](LICENSE): Project license information

@@ -3,11 +3,17 @@ Immich API Client for MCP integration
 Austrian efficiency for Sandra's 2000+ photo library management
 """
 
+import logging
 from pathlib import Path
 
 import httpx
 
 from immich_mcp.config import ImmichConfig, ImmichUser
+
+logger = logging.getLogger("immich_mcp.api")
+
+# Global API client instance for shared use
+api_client: "ImmichAPIClient | None" = None
 
 
 class ImmichAPIError(Exception):
@@ -27,27 +33,31 @@ class ImmichAPIClient:
         elif config.users and config.active_user:
             try:
                 self.current_user = config.get_active_user()
-            except ValueError:
+            except ValueError as e:
                 # Fallback to legacy mode if multi-user fails
                 if config.api_key:
                     self.current_user = ImmichUser(
                         name="default",
                         api_key=config.api_key,
                         role="admin",
-                        description="Legacy single-user mode"
+                        description="Legacy single-user mode",
                     )
                 else:
-                    raise ValueError("No valid user configuration found. Set IMMICH_API_KEY or IMMICH_USERS.")
+                    raise ValueError(
+                        "No valid user configuration found. Set IMMICH_API_KEY or IMMICH_USERS."
+                    ) from e
         elif config.api_key:
             # Legacy single-user mode
             self.current_user = ImmichUser(
                 name="default",
                 api_key=config.api_key,
                 role="admin",
-                description="Legacy single-user mode"
+                description="Legacy single-user mode",
             )
         else:
-            raise ValueError("No user configuration found. Set IMMICH_API_KEY for single user or IMMICH_USERS for multi-user.")
+            raise ValueError(
+                "No user configuration found. Set IMMICH_API_KEY for single user or IMMICH_USERS for multi-user."
+            )
 
         # Create HTTP client with proper headers
         self.client = httpx.AsyncClient(
@@ -233,7 +243,11 @@ class ImmichAPIClient:
         }
 
     async def search_photos(
-        self, query: str, search_type: str = "smart", limit: int = 50, ocr_language: str | None = None
+        self,
+        query: str,
+        search_type: str = "smart",
+        limit: int = 50,
+        ocr_language: str | None = None,
     ) -> list[dict]:
         """Search photos using various methods
 
@@ -286,23 +300,57 @@ class ImmichAPIClient:
             return result.get("assets", {}).get("items", [])
 
         else:  # filename search
-            # Use v2.4.0 search/metadata endpoint for filename search
-            params = {
-                "page": 1,
-                "size": limit,
-                "query": query,
-                "type": "ASSET"
-            }
+            # Use search/metadata for filename search
+            params = {"originalFileName": query, "limit": limit}
             result = await self._get("/search/metadata", params=params)
-            assets = result.get("assets", {}).get("items", [])
+            return result.get("assets", {}).get("items", [])
 
-            # Filter by filename in results
-            filtered = [
-                asset
-                for asset in assets
-                if query.lower() in asset.get("originalFileName", "").lower()
-            ]
-            return filtered[:limit]
+    async def get_timeline_assets(self, page: int = 1, size: int = 100) -> list[dict]:
+        """Get assets for timeline view. Tries POST /search/assets, GET /search/metadata, then GET /assets."""
+        size = min(size, 1000)
+        try:
+            body = {"page": page, "size": size, "order": "desc"}
+            result = await self._post("/search/assets", data=body)
+            if isinstance(result, list):
+                return result
+            items = result.get("items", result.get("assets", {}).get("items", []))
+            if isinstance(items, list):
+                return items
+        except ImmichAPIError:
+            pass
+        try:
+            params = {"page": page, "size": size, "type": "ASSET"}
+            result = await self._get("/search/metadata", params=params)
+            out = result.get("assets", {}).get("items", [])
+            if isinstance(out, list):
+                return out
+            if isinstance(result.get("items"), list):
+                return result["items"]
+        except ImmichAPIError:
+            pass
+        try:
+            # Fallback: GET /assets (skip/take) for servers that lack search endpoints
+            skip = (page - 1) * size
+            params = {"skip": skip, "take": size}
+            result = await self._get("/assets", params=params)
+            if isinstance(result, list):
+                return result
+            return result.get("assets", result.get("items", []))
+        except ImmichAPIError:
+            return []
+
+    async def get_map_assets(self) -> list[dict]:
+        """Get all geotagged assets for map display (Immich getMapMarkers-style)."""
+        try:
+            # Immich API: GET /map/markers returns list of { id, lat, lon, city, country, state }
+            result = await self._get("/map/markers")
+            if isinstance(result, list):
+                return result
+            if isinstance(result, dict):
+                return result.get("markers", result.get("features", result.get("items", [])))
+            return []
+        except ImmichAPIError:
+            return []
 
     async def get_asset_info(self, asset_id: str) -> dict:
         """Get detailed information about a specific asset
@@ -312,12 +360,7 @@ class ImmichAPIClient:
         """
         try:
             # Use search/metadata to find specific asset by ID
-            params = {
-                "page": 1,
-                "size": 1,
-                "query": asset_id,
-                "type": "ASSET"
-            }
+            params = {"page": 1, "size": 1, "query": asset_id, "type": "ASSET"}
             result = await self._get("/search/metadata", params=params)
             assets = result.get("assets", {}).get("items", [])
 
@@ -339,10 +382,12 @@ class ImmichAPIClient:
 
         except ImmichAPIError as e:
             if "not found" in str(e).lower() or "404" in str(e):
-                raise ImmichAPIError(f"Asset {asset_id} not found - individual asset access not available in Immich v2.4.0")
+                raise ImmichAPIError(
+                    f"Asset {asset_id} not found - individual asset access not available in Immich v2.4.0"
+                ) from e
             raise
 
-    async def get_asset_ocr(self, asset_id: str, include_bounding_boxes: bool = True) -> dict:
+    async def get_asset_ocr(self, asset_id: str, *, include_bounding_boxes: bool = True) -> dict:
         """Get OCR text and bounding boxes for a specific asset (v2.2.0+)
 
         Returns OCR information including extracted text and positional data.
@@ -373,7 +418,7 @@ class ImmichAPIClient:
                     "language": "unknown",
                     "confidence": 0.0,
                     "words": [],  # Individual word data
-                    "regions": []  # Text regions for v2.3.0+
+                    "regions": [],  # Text regions for v2.3.0+
                 }
             raise
 
@@ -626,7 +671,9 @@ class ImmichAPIClient:
             # Get basic asset count from search endpoint
             asset_count = 0
             try:
-                search_result = await self._get("/search/metadata", params={"page": 1, "size": 1, "type": "ASSET"})
+                search_result = await self._get(
+                    "/search/metadata", params={"page": 1, "size": 1, "type": "ASSET"}
+                )
                 asset_count = search_result.get("assets", {}).get("total", 0)
             except Exception:
                 pass
@@ -729,15 +776,23 @@ class ImmichAPIClient:
             # Test OCR endpoint availability
             try:
                 # Try OCR search to detect OCR capability
-                test_result = await self._get("/search/ocr", params={"query": "test", "limit": 1})
+                await self._get("/search/ocr", params={"query": "test", "limit": 1})
                 has_ocr = True
                 has_multilingual_ocr = True  # v2.4.0+ has multilingual OCR
                 has_ocr_bounding_boxes = True  # v2.4.0+ has bounding boxes
                 ocr_languages = [
-                    "english", "english_only",
-                    "chinese_simplified", "chinese_traditional", "japanese",
-                    "greek", "korean", "russian", "belarusian", "ukrainian", "thai",
-                    "latin_script_languages"
+                    "english",
+                    "english_only",
+                    "chinese_simplified",
+                    "chinese_traditional",
+                    "japanese",
+                    "greek",
+                    "korean",
+                    "russian",
+                    "belarusian",
+                    "ukrainian",
+                    "thai",
+                    "latin_script_languages",
                 ]
             except ImmichAPIError:
                 # OCR not available or endpoint changed
@@ -762,7 +817,7 @@ class ImmichAPIClient:
             try:
                 await self._get("/albums")
                 health_checks["albums_api"] = True
-            except:
+            except Exception:
                 health_checks["albums_api"] = False
 
             return {
@@ -820,7 +875,7 @@ class ImmichAPIClient:
             return result.get("libraries", [])
         except Exception as e:
             # Fallback for older Immich versions that might not have libraries endpoint
-            logger.warning(f"Libraries endpoint not available: {e}")
+            logger.warning("Libraries endpoint not available: %s", e)
             return []
 
     async def get_library_info(self, library_id: str) -> dict:
@@ -834,9 +889,13 @@ class ImmichAPIClient:
         """
         return await self._get(f"/libraries/{library_id}")
 
-    async def create_library(self, name: str, library_type: str = "UPLOAD",
-                           import_paths: list[str] | None = None,
-                           exclusion_patterns: list[str] | None = None) -> dict:
+    async def create_library(
+        self,
+        name: str,
+        library_type: str = "UPLOAD",
+        import_paths: list[str] | None = None,
+        exclusion_patterns: list[str] | None = None,
+    ) -> dict:
         """Create a new library.
 
         Args:
@@ -860,9 +919,13 @@ class ImmichAPIClient:
 
         return await self._post("/libraries", data)
 
-    async def update_library(self, library_id: str, name: str | None = None,
-                           import_paths: list[str] | None = None,
-                           exclusion_patterns: list[str] | None = None) -> dict:
+    async def update_library(
+        self,
+        library_id: str,
+        name: str | None = None,
+        import_paths: list[str] | None = None,
+        exclusion_patterns: list[str] | None = None,
+    ) -> dict:
         """Update library configuration.
 
         Args:
@@ -895,8 +958,13 @@ class ImmichAPIClient:
         """
         return await self._delete(f"/libraries/{library_id}")
 
-    async def scan_library(self, library_id: str, refresh_modified_files: bool = False,
-                          refresh_all_files: bool = False) -> dict:
+    async def scan_library(
+        self,
+        library_id: str,
+        *,
+        refresh_modified_files: bool = False,
+        refresh_all_files: bool = False,
+    ) -> dict:
         """Scan a library for new or changed files.
 
         Args:
@@ -997,6 +1065,58 @@ class ImmichAPIClient:
         """
         return await self._post(f"/libraries/{library_id}/clean-bundles")
 
+    async def update_asset_visibility(self, asset_id: str, visibility: str) -> dict:
+        """Update the visibility status of an asset (v2.5.0+ / Early 2026)
+
+        Args:
+            asset_id: Unique asset ID
+            visibility: One of "hidden", "archived", "private", "public"
+        """
+        return await self._put(f"/assets/{asset_id}", data={"visibility": visibility})
+
+    async def edit_asset(self, asset_id: str, operation: str, **params) -> dict:
+        """Perform image editing operations (Early 2026)
+
+        Args:
+            asset_id: Unique asset ID
+            operation: One of "crop", "rotate", "mirror"
+            **params: Additional parameters for the operation (e.g., angle, rect)
+        """
+        data = {"operation": operation, **params}
+        return await self._post(f"/assets/{asset_id}/edit", data=data)
+
+    async def get_binary(self, endpoint: str, params: dict | None = None) -> bytes:
+        """Make GET request to Immich API and return binary data"""
+        try:
+            url = f"{self.base_url}/api{endpoint}"
+            response = await self.client.get(url, params=params)
+            response.raise_for_status()
+            return response.content
+        except Exception as e:
+            raise ImmichAPIError(f"Binary GET {endpoint} failed: {e}") from e
+
+    async def get_asset_thumbnail(self, asset_id: str, format: str = "WEBP") -> bytes:
+        """Get the thumbnail bytes for an asset. Immich API: GET /assets/:id/thumbnail."""
+        return await self.get_binary(f"/assets/{asset_id}/thumbnail", params={"format": format})
+
+    async def get_all_people(self) -> list[dict]:
+        """Get all detected people"""
+        result = await self._get("/people")
+        return result.get("people", []) if isinstance(result, dict) else result
+
     async def close(self):
         """Close the HTTP client"""
         await self.client.aclose()
+
+
+async def get_api_client() -> ImmichAPIClient:
+    """Get initialized API client, creating if needed.
+
+    This is the primary way to get an API client instance in a way that
+    supports both MCP tools and FastAPI dependency injection.
+    """
+    global api_client
+    if api_client is None:
+        config = ImmichConfig.from_env()
+        api_client = ImmichAPIClient(config)
+    return api_client

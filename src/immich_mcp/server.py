@@ -1,13 +1,71 @@
 """
-ImmichMCP - FastMCP 2.10 Server for Immich Photo Management
+ImmichMCP - FastMCP 3.1 Server for Immich Photo Management
 
-Austrian efficiency for Sandra's 2000+ photo library.
-Provides 25+ tools: 5 core photo operations + 4 album management + 3 people/faces + 7 library management + 3 multi-user support + 3 administration
+Efficient Immich photo library management via MCP. 25+ tools: photo ops, albums, people/faces, library and admin.
 """
 
-import asyncio
-import logging
+# CRITICAL: Set stdio to binary mode on Windows for Antigravity IDE compatibility
+# Antigravity IDE is strict about JSON-RPC protocol and interprets trailing \r as "invalid trailing data"
+# This must happen BEFORE any imports that might write to stdout
+import os
 import sys
+
+if os.name == "nt":  # Windows only
+    try:
+        # Force binary mode for stdin/stdout to prevent CRLF conversion
+        import msvcrt
+
+        msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
+        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+    except (OSError, AttributeError):
+        # Fallback: just ensure no CRLF conversion
+        pass
+
+
+# DevNullStdout class for stdio mode to prevent any console output during initialization
+class DevNullStdout:
+    """Suppress all stdout writes during stdio mode to prevent JSON-RPC protocol corruption."""
+
+    def __init__(self, original_stdout):
+        self.original_stdout = original_stdout
+        self.buffer = []
+
+    def write(self, text):
+        # Buffer output instead of writing to stdout
+        self.buffer.append(text)
+
+    def flush(self):
+        # Do nothing - prevent any stdout writes
+        pass
+
+    def get_buffered_output(self):
+        """Get all buffered output for debugging if needed."""
+        return "".join(self.buffer)
+
+    def restore(self):
+        """Restore original stdout."""
+        sys.stdout = self.original_stdout
+
+
+# CRITICAL: Detect stdio mode BEFORE importing logger
+# This must be done before ANY logging imports
+_is_stdio_mode = not sys.stdout.isatty()
+
+# NUCLEAR OPTION: Completely disable logger during stdio mode
+# Import logger first, then replace it with a no-op to prevent any stdout writes
+import logging
+
+if _is_stdio_mode:
+    # Replace stdout with our devnull version to catch any accidental writes
+    original_stdout = sys.stdout
+    sys.stdout = DevNullStdout(original_stdout)
+
+    # The DevNullStdout override above will catch accidental direct prints to stdout.
+    # For standard logging, we ensure it goes to stderr to prevent breaking the JSON-RPC
+    # protocol that uses stdout.
+    pass
+
+import asyncio
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -38,55 +96,56 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
+    stream=sys.stderr,
 )
 logger = logging.getLogger("immich_mcp")
-
-# Global API client instance
-api_client: ImmichAPIClient | None = None
 
 # Global config instance for user management
 config: ImmichConfig | None = None
 
 
 class ImmichMCP(FastMCP):
-    """ImmichMCP server implementation extending FastMCP 2.10 base."""
+    """ImmichMCP server implementation (FastMCP 3.1)."""
 
     def __init__(self, **kwargs):
-        """Initialize the ImmichMCP server.
-
-        Args:
-            **kwargs: Additional arguments to pass to FastMCP
-        """
-        # Set default values if not provided
+        """Initialize the ImmichMCP server."""
         kwargs.setdefault("name", "ImmichMCP")
         kwargs.setdefault("version", "1.0.0")
-
-        # Initialize FastMCP without deprecated log_level parameter
         super().__init__(
-            name=kwargs["name"], version=kwargs["version"]
+            name=kwargs["name"],
+            version=kwargs["version"],
+            instructions="""You are ImmichMCP, a comprehensive FastMCP 3.1 server for Immich photo management.
+
+CORE CAPABILITIES:
+- Photo Management: Browse, search, upload, and organize your Immich photo library
+- Album Operations: Create, manage, and organize photo albums and collections
+- People & Faces: Face recognition, person identification, and facial clustering
+- Library Administration: Multi-user support, library management, and user permissions
+- Asset Organization: Tagging, metadata management, and advanced search capabilities
+
+CONVERSATIONAL FEATURES:
+- Tools return natural language responses alongside structured data
+- Sampling allows autonomous orchestration of complex photo operations
+- Agentic capabilities for intelligent content discovery and management
+
+RESPONSE FORMAT:
+- All tools return dictionaries with 'success' boolean and 'message' for conversational responses
+- Error responses include 'error' field with descriptive message
+- Success responses include relevant data fields and natural language summaries
+
+PORTMANTEAU DESIGN:
+Tools are consolidated into logical groups. Each portmanteau tool handles multiple related operations through an 'operation' parameter.
+""",
         )
         self.immich_client: ImmichAPIClient | None = None
-        self.app = FastAPI(
-            title="ImmichMCP",
-            description="FastMCP 2.10 server for Immich photo management",
-            version="1.0.0",
-        )
-
-        # Include API routers
-        self.app.include_router(v1_router, prefix="/immich-mcp")
-
-        # Add startup and shutdown event handlers
-        self.app.add_event_handler("startup", self.startup_event)
-        self.app.add_event_handler("shutdown", self.shutdown_event)
 
     async def startup_event(self):
         """Initialize resources when the server starts."""
         global config
         try:
-            # Get the config and initialize the Immich client
             config = get_config()
             self.immich_client = ImmichAPIClient(config=config)
-            logger.info(f"Immich client initialized for user: {config.active_user}")
+            logger.info("Immich client initialized for user: %s", config.active_user)
         except Exception as e:
             logger.error("Failed to initialize Immich client: %s", e)
             raise
@@ -97,20 +156,44 @@ class ImmichMCP(FastMCP):
             await self.immich_client.close()
             logger.info("Immich client closed")
 
-    def get_fastapi_app(self) -> FastAPI:
-        """Get the FastAPI application instance.
-
-        Returns:
-            The configured FastAPI application
-        """
-        return self.app
-
 
 # Initialize FastMCP server
 mcp = ImmichMCP()
 
-# Expose the FastAPI app for Uvicorn
-app = mcp.app
+# Register agentic workflow tools
+from .agentic import register_agentic_tools
+
+register_agentic_tools()
+
+# CRITICAL: After server initialization, restore stdout for stdio mode
+if _is_stdio_mode:
+    if hasattr(sys.stdout, "restore"):
+        sys.stdout.restore()
+
+# FastMCP 3.1: separate FastAPI app for custom routes; mount MCP HTTP app at /mcp
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def _web_lifespan(_app: FastAPI):
+    await mcp.startup_event()
+    try:
+        yield
+    finally:
+        await mcp.shutdown_event()
+
+
+_web_app = FastAPI(
+    title="ImmichMCP",
+    description="FastMCP 3.1 server for Immich photo management",
+    version="1.0.0",
+    lifespan=_web_lifespan,
+)
+_web_app.include_router(v1_router, prefix="/api/v1")
+_web_app.mount("/mcp", mcp.http_app())
+
+# Expose for uvicorn (e.g. web_sota/start.ps1)
+app = _web_app
 
 
 # Pydantic Models for all 15 tools
@@ -136,6 +219,8 @@ class PhotoSearchResult(BaseModel):
     smart_search_score: float | None = Field(
         default=None, description="CLIP search relevance score"
     )
+    latitude: float | None = Field(default=None, description="GPS Latitude")
+    longitude: float | None = Field(default=None, description="GPS Longitude")
 
 
 class UploadResult(BaseModel):
@@ -171,7 +256,9 @@ class PhotoInfo(BaseModel):
     people: list[str] = Field(default_factory=list)
     albums: list[str] = Field(default_factory=list)
     ocr_text: str | None = Field(default=None, description="Extracted OCR text (v2.2.0+)")
-    ocr_bounding_boxes: list[dict[str, Any]] = Field(default_factory=list, description="OCR bounding boxes (v2.3.0+)")
+    ocr_bounding_boxes: list[dict[str, Any]] = Field(
+        default_factory=list, description="OCR bounding boxes (v2.3.0+)"
+    )
     ocr_language: str | None = Field(default=None, description="OCR language used (v2.3.0+)")
     ocr_confidence: float | None = Field(default=None, description="OCR confidence score (v2.3.0+)")
 
@@ -326,7 +413,9 @@ class HealthStatus(BaseModel):
     server_features: list[str] = Field(description="Available server features")
     is_v2_plus: bool = Field(default=False, description="Whether server is v2.0.0+")
     has_ocr: bool = Field(default=False, description="Whether server supports OCR search (v2.2.0+)")
-    has_multilingual_ocr: bool = Field(default=False, description="Whether server supports multilingual OCR (v2.3.0+)")
+    has_multilingual_ocr: bool = Field(
+        default=False, description="Whether server supports multilingual OCR (v2.3.0+)"
+    )
     ocr_languages: list[str] = Field(default_factory=list, description="Supported OCR languages")
     database_connected: bool = Field(description="Database connection status")
     redis_connected: bool = Field(description="Redis connection status")
@@ -341,20 +430,16 @@ class OcrInfo(BaseModel):
     """OCR information for an asset"""
 
     text: str = Field(description="Extracted OCR text")
-    bounding_boxes: list[dict[str, Any]] = Field(default_factory=list, description="Text bounding boxes with coordinates")
+    bounding_boxes: list[dict[str, Any]] = Field(
+        default_factory=list, description="Text bounding boxes with coordinates"
+    )
     language: str = Field(description="Detected or configured OCR language")
     confidence: float = Field(description="OCR confidence score (0.0-1.0)")
     asset_id: str = Field(description="Asset ID")
     has_bounding_boxes: bool = Field(description="Whether bounding box data is available (v2.3.0+)")
 
 
-async def get_api_client() -> ImmichAPIClient:
-    """Get initialized API client, creating if needed"""
-    global api_client
-    if api_client is None:
-        config = ImmichConfig.from_env()
-        api_client = ImmichAPIClient(config)
-    return api_client
+from .immich_api import get_api_client
 
 
 # ====== PHASE 1: CORE PHOTO OPERATIONS (5 tools) ======
@@ -545,7 +630,7 @@ async def search_photos(
     limit: int = Field(50, description="Maximum results to return"),
     ocr_language: str = Field(
         default=None,
-        description="OCR language model (v2.3.0+): english, english_only, chinese_simplified, chinese_traditional, japanese, greek, korean, russian, belarusian, ukrainian, thai, latin_script_languages"
+        description="OCR language model (v2.3.0+): english, english_only, chinese_simplified, chinese_traditional, japanese, greek, korean, russian, belarusian, ukrainian, thai, latin_script_languages",
     ),
 ) -> list[PhotoSearchResult]:
     r"""Search photos using CLIP smart search, OCR text search, or metadata queries.
@@ -691,10 +776,7 @@ async def search_photos(
 
         # Perform search based on type
         results = await client.search_photos(
-            query=query,
-            search_type=search_type,
-            limit=limit,
-            ocr_language=ocr_language
+            query=query, search_type=search_type, limit=limit, ocr_language=ocr_language
         )
 
         # Convert to response format
@@ -718,6 +800,8 @@ async def search_photos(
                 is_trashed=photo.get("isTrashed", False),
                 checksum=photo.get("checksum", ""),
                 smart_search_score=photo.get("score"),
+                latitude=photo.get("exifInfo", {}).get("latitude"),
+                longitude=photo.get("exifInfo", {}).get("longitude"),
             )
             photo_results.append(photo_result)
 
@@ -729,6 +813,122 @@ async def search_photos(
 
 
 @mcp.tool()
+async def update_asset_visibility(asset_id: str, visibility: str) -> dict:
+    """Update visibility status of a photo or video (v2.5.0+ / Early 2026).
+
+    Visibility options: 'hidden', 'archived', 'private', 'public'.
+    Required for advanced asset categorization and privacy management.
+
+    Parameters:
+        asset_id (str, REQUIRED): Unique identifier of the asset.
+        visibility (str, REQUIRED): Target visibility state ("hidden", "archived", "private", "public").
+
+    Returns:
+        Dict with success status and descriptive message.
+    """
+    try:
+        client = await get_api_client()
+        result = await client.update_asset_visibility(asset_id, visibility)
+        return {
+            "success": True,
+            "message": f"Asset {asset_id} visibility set to {visibility}",
+            "data": result,
+        }
+    except Exception as e:
+        logger.error(f"Error updating visibility for {asset_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@mcp.tool()
+async def edit_photo(
+    asset_id: str,
+    operation: str,
+    angle: int | None = None,
+    direction: str | None = None,
+    x: int | None = None,
+    y: int | None = None,
+    width: int | None = None,
+    height: int | None = None,
+) -> dict:
+    """Perform basic image editing: crop, rotate, or mirror (Early 2026).
+
+    Supports non-destructive edits using Immich's native image processor.
+
+    Operations:
+        - rotate: params={angle: 90 | 180 | 270}
+        - mirror: params={direction: 'horizontal' | 'vertical'}
+        - crop: params={x: int, y: int, width: int, height: int}
+
+    Parameters:
+        asset_id (str, REQUIRED): Unique identifier of the asset.
+        operation (str, REQUIRED): Edit operation name ("rotate", "mirror", "crop").
+        angle (int, OPTIONAL): Rotation angle (90, 180, 270).
+        direction (str, OPTIONAL): Mirror direction ('horizontal', 'vertical').
+        x, y, width, height (int, OPTIONAL): Crop rectangle coordinates and dimensions.
+
+    Returns:
+        Dict with success status and edit details.
+    """
+    try:
+        client = await get_api_client()
+        # Filter out None values to send only relevant parameters
+        params = {
+            k: v
+            for k, v in {
+                "angle": angle,
+                "direction": direction,
+                "x": x,
+                "y": y,
+                "width": width,
+                "height": height,
+            }.items()
+            if v is not None
+        }
+        result = await client.edit_asset(asset_id, operation, **params)
+        return {
+            "success": True,
+            "message": f"Successfully performed {operation} on photo {asset_id}",
+            "data": result,
+        }
+    except Exception as e:
+        logger.error(f"Error editing photo {asset_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@mcp.tool()
+async def switch_immich_user(username: str) -> dict:
+    """Switch the active Immich user context for the MCP server.
+
+    Changes the API key used for subsequent requests to the specified user's key.
+    Useful for multi-account management or switching between admin/user contexts.
+
+    Parameters:
+        username (str, REQUIRED): The username of the account to switch to.
+            Must be one of the users configured in IMMICH_USERS.
+
+    Returns:
+        Dict indicating success and the new active user.
+    """
+    try:
+        global config, api_client
+        if not config:
+            config = get_config()
+
+        user = config.switch_user(username)
+        # Ensure the global client is updated if it exists
+        if api_client:
+            api_client.switch_user(user)
+
+        return {
+            "success": True,
+            "message": f"Switched active Immich user to '{username}'",
+            "active_user": username,
+        }
+    except Exception as e:
+        logger.error(f"Failed to switch user to {username}: {e}")
+        return {"success": False, "error": str(e)}
+
+
 async def get_photo_info(asset_id: str) -> PhotoInfo:
     r"""Get complete metadata and EXIF information for a specific photo.
 
@@ -901,7 +1101,10 @@ async def get_photo_info(asset_id: str) -> PhotoInfo:
 
 @mcp.tool()
 async def get_ocr_data(
-    asset_id: str, include_bounding_boxes: bool = Field(default=True, description="Include bounding box coordinates")
+    asset_id: str,
+    include_bounding_boxes: bool = Field(
+        default=True, description="Include bounding box coordinates"
+    ),
 ) -> OCRResult:
     r"""Get OCR text extraction and bounding box data for a photo (v2.2.0+ with v2.3.0+ enhancements).
 
@@ -999,7 +1202,9 @@ async def get_ocr_data(
     """
     try:
         client = await get_api_client()
-        ocr_data = await client.get_asset_ocr(asset_id, include_bounding_boxes=include_bounding_boxes)
+        ocr_data = await client.get_asset_ocr(
+            asset_id, include_bounding_boxes=include_bounding_boxes
+        )
 
         return OCRResult(
             asset_id=asset_id,
@@ -1866,17 +2071,7 @@ async def get_storage_info() -> StorageInfo:
 
     except ImmichAPIError as e:
         logger.error("Immich API error in get_storage_info: %s", e)
-        return StorageInfo(
-            used_bytes=0,
-            available_bytes=0,
-            total_bytes=0,
-            usage_percentage=0.0,
-            photo_count=0,
-            video_count=0,
-            user_count=0,
-            album_count=0,
-            storage_usage_by_user=[],
-        )
+        raise
 
 
 @mcp.tool()
@@ -2053,28 +2248,12 @@ async def server_health() -> HealthStatus:
         )
 
     except ImmichAPIError as e:
-        end_time = asyncio.get_event_loop().time()
-        response_time_ms = int((end_time - start_time) * 1000)
-
         logger.error("Immich API error in server_health: %s", e)
-        return HealthStatus(
-            server_version="Unknown",
-            server_features=[],
-            is_v2_plus=False,
-            has_ocr=False,
-            has_multilingual_ocr=False,
-            ocr_languages=[],
-            database_connected=False,
-            redis_connected=False,
-            storage_accessible=False,
-            ml_services_available=False,
-            response_time_ms=response_time_ms,
-            uptime_seconds=0,
-            error_messages=[str(e)],
-        )
+        raise
 
 
 # ===== LIBRARY MANAGEMENT TOOLS =====
+
 
 @mcp.tool()
 async def list_libraries() -> list[dict]:
@@ -2137,7 +2316,7 @@ async def create_library(
     name: str,
     library_type: str = "UPLOAD",
     import_paths: list[str] | None = None,
-    exclusion_patterns: list[str] | None = None
+    exclusion_patterns: list[str] | None = None,
 ) -> dict:
     """Create a new Immich library for organizing external photo folders.
 
@@ -2166,14 +2345,14 @@ async def create_library(
                 if not Path(path).exists():
                     return {
                         "error": f"Import path does not exist: {path}",
-                        "suggestion": "Verify the path is accessible and try again"
+                        "suggestion": "Verify the path is accessible and try again",
                     }
 
         library = await client.create_library(
             name=name,
             library_type=library_type,
             import_paths=import_paths,
-            exclusion_patterns=exclusion_patterns
+            exclusion_patterns=exclusion_patterns,
         )
 
         return {
@@ -2185,22 +2364,17 @@ async def create_library(
             "next_steps": [
                 "Add more import paths if needed",
                 "Configure exclusion patterns",
-                "Run initial scan to import photos"
-            ]
+                "Run initial scan to import photos",
+            ],
         }
     except Exception as e:
         logger.error(f"Failed to create library '{name}': {e}")
-        return {
-            "error": str(e),
-            "suggestion": "Check library name uniqueness and path permissions"
-        }
+        return {"error": str(e), "suggestion": "Check library name uniqueness and path permissions"}
 
 
 @mcp.tool()
 async def scan_library(
-    library_id: str,
-    refresh_modified_files: bool = False,
-    refresh_all_files: bool = False
+    library_id: str, refresh_modified_files: bool = False, refresh_all_files: bool = False
 ) -> dict:
     """Scan a library for new or changed photos from external folders.
 
@@ -2228,7 +2402,7 @@ async def scan_library(
         scan_result = await client.scan_library(
             library_id=library_id,
             refresh_modified_files=refresh_modified_files,
-            refresh_all_files=refresh_all_files
+            refresh_all_files=refresh_all_files,
         )
 
         # Calculate scan scope
@@ -2247,15 +2421,15 @@ async def scan_library(
             "tips": [
                 "Use refresh_modified_files for regular updates",
                 "Use refresh_all_files for initial setup or major changes",
-                "Check scan results for any import errors"
-            ]
+                "Check scan results for any import errors",
+            ],
         }
     except Exception as e:
         logger.error(f"Failed to scan library {library_id}: {e}")
         return {
             "error": str(e),
             "library_id": library_id,
-            "suggestion": "Verify library exists and has valid import paths"
+            "suggestion": "Verify library exists and has valid import paths",
         }
 
 
@@ -2283,7 +2457,7 @@ async def add_library_location(library_id: str, path: str) -> dict:
         if not Path(path).exists():
             return {
                 "error": f"Path does not exist: {path}",
-                "suggestion": "Verify the path is correct and accessible"
+                "suggestion": "Verify the path is correct and accessible",
             }
 
         # Add the location
@@ -2301,8 +2475,8 @@ async def add_library_location(library_id: str, path: str) -> dict:
             "message": f"Added location '{path}' to library",
             "next_steps": [
                 "Run scan_library to import photos from new location",
-                "Configure exclusion patterns if needed"
-            ]
+                "Configure exclusion patterns if needed",
+            ],
         }
     except Exception as e:
         logger.error(f"Failed to add location {path} to library {library_id}: {e}")
@@ -2310,7 +2484,7 @@ async def add_library_location(library_id: str, path: str) -> dict:
             "error": str(e),
             "library_id": library_id,
             "path": path,
-            "suggestion": "Check library permissions and path accessibility"
+            "suggestion": "Check library permissions and path accessibility",
         }
 
 
@@ -2344,7 +2518,7 @@ async def remove_library_location(library_id: str, path: str) -> dict:
             "remaining_locations": len(library_info.get("importPaths", [])),
             "result": result,
             "message": f"Removed location '{path}' from library",
-            "warning": "Photos from this location may still exist in the library"
+            "warning": "Photos from this location may still exist in the library",
         }
     except Exception as e:
         logger.error(f"Failed to remove location {path} from library {library_id}: {e}")
@@ -2352,15 +2526,18 @@ async def remove_library_location(library_id: str, path: str) -> dict:
             "error": str(e),
             "library_id": library_id,
             "path": path,
-            "suggestion": "Verify the location exists in the library"
+            "suggestion": "Verify the location exists in the library",
         }
 
 
 @mcp.tool()
-async def manage_library(library_id: str, action: str,
-                        name: str | None = None,
-                        import_paths: list[str] | None = None,
-                        exclusion_patterns: list[str] | None = None) -> dict:
+async def manage_library(
+    library_id: str,
+    action: str,
+    name: str | None = None,
+    import_paths: list[str] | None = None,
+    exclusion_patterns: list[str] | None = None,
+) -> dict:
     """Perform various management actions on an Immich library.
 
     Comprehensive library management including updates, optimization, cleanup,
@@ -2395,14 +2572,14 @@ async def manage_library(library_id: str, action: str,
             if not any([name, import_paths, exclusion_patterns]):
                 return {
                     "error": "Update action requires at least one parameter to change",
-                    "suggestion": "Provide name, import_paths, or exclusion_patterns"
+                    "suggestion": "Provide name, import_paths, or exclusion_patterns",
                 }
 
             result = await client.update_library(
                 library_id=library_id,
                 name=name,
                 import_paths=import_paths,
-                exclusion_patterns=exclusion_patterns
+                exclusion_patterns=exclusion_patterns,
             )
             message = f"Updated library '{library_name}' configuration"
 
@@ -2425,7 +2602,13 @@ async def manage_library(library_id: str, action: str,
         else:
             return {
                 "error": f"Unknown action: {action}",
-                "available_actions": ["update", "refresh", "optimize", "empty_trash", "clean_bundles"]
+                "available_actions": [
+                    "update",
+                    "refresh",
+                    "optimize",
+                    "empty_trash",
+                    "clean_bundles",
+                ],
             }
 
         return {
@@ -2434,7 +2617,7 @@ async def manage_library(library_id: str, action: str,
             "action": action,
             "result": result,
             "message": message,
-            "library_id": library_id
+            "library_id": library_id,
         }
 
     except Exception as e:
@@ -2443,11 +2626,12 @@ async def manage_library(library_id: str, action: str,
             "error": str(e),
             "library_id": library_id,
             "action": action,
-            "suggestion": "Verify library exists and action is valid"
+            "suggestion": "Verify library exists and action is valid",
         }
 
 
 # ===== MULTI-USER MANAGEMENT TOOLS =====
+
 
 @mcp.tool()
 async def list_users() -> dict:
@@ -2467,26 +2651,25 @@ async def list_users() -> dict:
 
         users_info = []
         for username, user in config.users.items():
-            users_info.append({
-                "name": user.name,
-                "role": user.role,
-                "description": user.description,
-                "is_active": username == config.active_user
-            })
+            users_info.append(
+                {
+                    "name": user.name,
+                    "role": user.role,
+                    "description": user.description,
+                    "is_active": username == config.active_user,
+                }
+            )
 
         return {
             "success": True,
             "users": users_info,
             "active_user": config.active_user,
             "total_users": len(config.users),
-            "message": f"Found {len(config.users)} configured users"
+            "message": f"Found {len(config.users)} configured users",
         }
     except Exception as e:
         logger.error(f"Failed to list users: {e}")
-        return {
-            "error": str(e),
-            "suggestion": "Check user configuration in environment variables"
-        }
+        return {"error": str(e), "suggestion": "Check user configuration in environment variables"}
 
 
 @mcp.tool()
@@ -2522,14 +2705,14 @@ async def switch_user(username: str) -> dict:
             "user_role": new_user.role,
             "user_description": new_user.description,
             "message": f"Successfully switched to user '{username}' ({new_user.role})",
-            "note": "All subsequent operations will use this user's permissions and libraries"
+            "note": "All subsequent operations will use this user's permissions and libraries",
         }
     except Exception as e:
         logger.error(f"Failed to switch to user {username}: {e}")
         return {
             "error": str(e),
             "requested_user": username,
-            "suggestion": "Verify user exists in configuration"
+            "suggestion": "Verify user exists in configuration",
         }
 
 
@@ -2567,14 +2750,11 @@ async def get_current_user() -> dict:
             "role": current_user.role,
             "description": current_user.description,
             "capabilities": capabilities,
-            "message": f"Active user: {current_user.name} ({current_user.role})"
+            "message": f"Active user: {current_user.name} ({current_user.role})",
         }
     except Exception as e:
         logger.error(f"Failed to get current user: {e}")
-        return {
-            "error": str(e),
-            "suggestion": "Check user configuration"
-        }
+        return {"error": str(e), "suggestion": "Check user configuration"}
 
 
 @mcp.tool()
@@ -2614,77 +2794,23 @@ async def get_user_libraries(username: str | None = None) -> dict:
             "user": target_user,
             "libraries": libraries,
             "library_count": len(libraries),
-            "message": f"User '{target_user}' has access to {len(libraries)} libraries"
+            "message": f"User '{target_user}' has access to {len(libraries)} libraries",
         }
     except Exception as e:
         logger.error(f"Failed to get libraries for user {username}: {e}")
         return {
             "error": str(e),
             "user": username or "current",
-            "suggestion": "Verify user exists and has library access permissions"
+            "suggestion": "Verify user exists and has library access permissions",
         }
 
 
 def main():
-    """Main entry point for ImmichMCP server"""
-    import argparse
+    """Main entry point with unified transport handling (FastMCP 3.1)."""
+    from .transport import run_server
 
-    parser = argparse.ArgumentParser(description="Immich MCP Server - Dual Transport Support")
-    parser.add_argument(
-        "--transport",
-        choices=["stdio", "http"],
-        default="stdio",
-        help="Transport mode: stdio (MCP protocol) or http (REST API)"
-    )
-    parser.add_argument(
-        "--host",
-        default="127.0.0.1",
-        help="Host for HTTP server (default: 127.0.0.1)"
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8000,
-        help="Port for HTTP server (default: 8000)"
-    )
-
-    args = parser.parse_args()
-
-    if args.transport == "stdio":
-        # CRITICAL: No console output in stdio mode - stdout is used for JSON-RPC protocol
-        # Logging should go to stderr or log files only
-        logger.info("Starting ImmichMCP - FastMCP 2.1 Server (stdio mode)")
-        logger.info("Austrian efficiency for your 2000+ photo library!")
-
-        # Run the FastMCP server in stdio mode
-        mcp.run(log_level="INFO")
-
-    elif args.transport == "http":
-        import uvicorn
-        logger.info("Starting ImmichMCP - HTTP REST API Server")
-        logger.info(f"Austrian efficiency for your 2000+ photo library!")
-        logger.info(f"Server will be available at http://{args.host}:{args.port}")
-
-        # Get the FastAPI app from the MCP server
-        app = mcp.get_fastapi_app()
-
-        # Add CORS middleware for web client access
-        from fastapi.middleware.cors import CORSMiddleware
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],  # Configure appropriately for production
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-
-        # Run the FastAPI server
-        uvicorn.run(
-            app,
-            host=args.host,
-            port=args.port,
-            log_level="info"
-        )
+    logger.info("Starting ImmichMCP - FastMCP 3.1 Server")
+    run_server(mcp, server_name="immich-mcp")
 
 
 if __name__ == "__main__":
