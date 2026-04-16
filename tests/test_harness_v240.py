@@ -6,15 +6,17 @@ Austrian efficiency: Complete test coverage with clear pass/fail reporting
 """
 
 import asyncio
-import sys
-import os
-from pathlib import Path
-from typing import Dict, List, Any
-import time
 import json
+import os
+import sys
+import time
+from pathlib import Path
+from typing import Any
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+import contextlib
 
 from immich_mcp.config import ImmichConfig
 from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError
@@ -25,16 +27,10 @@ class TestHarness:
 
     def __init__(self):
         self.results = {
-            "summary": {
-                "total_tests": 0,
-                "passed": 0,
-                "failed": 0,
-                "skipped": 0,
-                "duration": 0
-            },
+            "summary": {"total_tests": 0, "passed": 0, "failed": 0, "skipped": 0, "duration": 0},
             "tests": [],
             "server_info": {},
-            "compatibility_score": 0
+            "compatibility_score": 0,
         }
 
         # Get configuration from environment
@@ -42,23 +38,13 @@ class TestHarness:
         self.api_key = os.getenv("IMMICH_API_KEY")
 
         if not self.api_key:
-            print("ERROR: IMMICH_API_KEY environment variable not set")
-            print("   Set it with: $env:IMMICH_API_KEY = 'your-api-key'")
             sys.exit(1)
 
-        self.config = ImmichConfig(
-            server_url=self.server_url,
-            api_key=self.api_key,
-            timeout=60
-        )
+        self.config = ImmichConfig(server_url=self.server_url, api_key=self.api_key, timeout=60)
 
-    async def run_all_tests(self) -> Dict[str, Any]:
+    async def run_all_tests(self) -> dict[str, Any]:
         """Run complete test suite"""
         start_time = time.time()
-
-        print("STARTING ImmichMCP v2.4.0 Compatibility Test Harness")
-        print(f"Server: {self.server_url}")
-        print("=" * 60)
 
         try:
             # Initialize API client
@@ -88,7 +74,7 @@ class TestHarness:
 
         return self.results
 
-    def record_test(self, test_name: str, passed: bool, message: str = "", details: Dict = None):
+    def record_test(self, test_name: str, passed: bool, message: str = "", details: dict | None = None):
         """Record a test result"""
         self.results["summary"]["total_tests"] += 1
 
@@ -104,11 +90,10 @@ class TestHarness:
             "status": status,
             "passed": passed,
             "message": message,
-            "details": details or {}
+            "details": details or {},
         }
 
         self.results["tests"].append(test_result)
-        print(f"{status} {test_name}: {message}")
 
     async def test_basic_connectivity(self):
         """Test basic server connectivity"""
@@ -120,7 +105,7 @@ class TestHarness:
                 "basic_connectivity",
                 True,
                 f"Connected to Immich {server_info.get('version', 'Unknown')}",
-                {"server_info": server_info}
+                {"server_info": server_info},
             )
 
         except Exception as e:
@@ -130,17 +115,11 @@ class TestHarness:
         """Test search endpoint functionality"""
         # Test search/metadata endpoint
         try:
-            result = await self.api_client._get("/search/metadata", params={
-                "page": 1,
-                "size": 10,
-                "type": "ASSET"
-            })
+            result = await self.api_client._get("/search/metadata", params={"page": 1, "size": 10, "type": "ASSET"})
 
             if "assets" in result and "items" in result["assets"]:
                 self.record_test(
-                    "search_metadata_endpoint",
-                    True,
-                    f"Found {result['assets']['total']} assets via search/metadata"
+                    "search_metadata_endpoint", True, f"Found {result['assets']['total']} assets via search/metadata"
                 )
             else:
                 self.record_test("search_metadata_endpoint", False, "Invalid response structure")
@@ -171,7 +150,9 @@ class TestHarness:
                 asset_id = assets[0]["id"]
                 try:
                     await self.api_client._get(f"/assets/{asset_id}")
-                    self.record_test("individual_asset_access", False, "Individual asset access should be blocked in v2.4.0")
+                    self.record_test(
+                        "individual_asset_access", False, "Individual asset access should be blocked in v2.4.0"
+                    )
                 except ImmichAPIError as e:
                     if "404" in str(e) or "not found" in str(e).lower():
                         self.record_test("individual_asset_access", True, "Individual asset access correctly blocked")
@@ -206,14 +187,16 @@ class TestHarness:
                 "version_detection": "version" in server_info,
                 "v2_plus_detection": server_info.get("is_v2_plus") is True,
                 "api_architecture": server_info.get("api_architecture") == "search_based",
-                "individual_access_flag": server_info.get("individual_asset_access") is False
+                "individual_access_flag": server_info.get("individual_asset_access") is False,
             }
 
             passed_checks = sum(checks.values())
             total_checks = len(checks)
 
             if passed_checks == total_checks:
-                self.record_test("server_info_adaptation", True, f"All server info checks passed ({passed_checks}/{total_checks})")
+                self.record_test(
+                    "server_info_adaptation", True, f"All server info checks passed ({passed_checks}/{total_checks})"
+                )
             else:
                 failed = [k for k, v in checks.items() if not v]
                 self.record_test("server_info_adaptation", False, f"Failed checks: {failed}")
@@ -248,10 +231,8 @@ class TestHarness:
             album_id = album["id"]
 
             # Clean up
-            try:
+            with contextlib.suppress(BaseException):
                 await self.api_client._delete(f"/albums/{album_id}")
-            except:
-                pass
 
             self.record_test("album_creation_compatibility", True, "Album creation works")
         except Exception as e:
@@ -287,9 +268,13 @@ class TestHarness:
             duration = time.time() - start
 
             if duration < 5.0:  # Should be fast
-                self.record_test("search_performance", True, f"Search performance good: {duration:.2f}s for {len(results)} results")
+                self.record_test(
+                    "search_performance", True, f"Search performance good: {duration:.2f}s for {len(results)} results"
+                )
             else:
-                self.record_test("search_performance", False, f"Search too slow: {duration:.2f}s for {len(results)} results")
+                self.record_test(
+                    "search_performance", False, f"Search too slow: {duration:.2f}s for {len(results)} results"
+                )
 
         except Exception as e:
             self.record_test("search_performance", False, f"Performance test failed: {e}")
@@ -315,64 +300,37 @@ class TestHarness:
             score = (passed / total) * 100
             self.results["compatibility_score"] = score
 
-            if score >= 90:
-                rating = "EXCELLENT"
-            elif score >= 80:
-                rating = "GOOD"
-            elif score >= 70:
-                rating = "FAIR"
+            if score >= 90 or score >= 80 or score >= 70:
+                pass
             else:
-                rating = "POOR"
-
-            print(f"\nCOMPATIBILITY SCORE: {score:.1f}% ({rating})")
+                pass
 
     def print_summary(self):
         """Print detailed test summary"""
-        summary = self.results["summary"]
-
-        print("\n" + "=" * 60)
-        print("TEST SUMMARY")
-        print("=" * 60)
-        print(f"Total Tests: {summary['total_tests']}")
-        print(f"PASSED: {summary['passed']}")
-        print(f"FAILED: {summary['failed']}")
-        print(f"SKIPPED: {summary['skipped']}")
-        print(".2f")
-        print(".1f")
+        self.results["summary"]
 
         # Show server info
         if self.results["server_info"]:
-            server = self.results["server_info"]
-            print(f"\nSERVER INFO:")
-            print(f"   Version: {server.get('version', 'Unknown')}")
-            print(f"   API Architecture: {server.get('api_architecture', 'Unknown')}")
-            print(f"   OCR Available: {server.get('has_ocr', False)}")
+            self.results["server_info"]
 
         # Show failed tests
         failed_tests = [t for t in self.results["tests"] if not t["passed"]]
         if failed_tests:
-            print("\nFAILED TESTS:")
-            for test in failed_tests:
-                print(f"   • {test['name']}: {test['message']}")
+            for _test in failed_tests:
+                pass
 
         # Show recommendations
         if self.results["compatibility_score"] < 80:
-            print("\nRECOMMENDATIONS:")
-            print("   • Check Immich server version (should be v2.4.0+)")
-            print("   • Verify API key has correct permissions")
-            print("   • Check network connectivity to server")
-            print("   • Review failed test details above")
+            pass
 
-    def save_results(self, filename: str = None):
+    def save_results(self, filename: str | None = None):
         """Save test results to JSON file"""
         if not filename:
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             filename = f"immich_mcp_v240_test_results_{timestamp}.json"
 
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(self.results, f, indent=2, default=str)
-
-        print(f"\nResults saved to: {filename}")
 
 
 async def main():
@@ -389,17 +347,13 @@ async def main():
         # Exit with appropriate code
         score = harness.results["compatibility_score"]
         if score >= 80:
-            print("\nSUCCESS: ImmichMCP is compatible with Immich v2.4.0!")
             sys.exit(0)
         else:
-            print(f"\nWARNING: ImmichMCP compatibility issues detected ({score:.1f}%)")
             sys.exit(1)
 
     except KeyboardInterrupt:
-        print("\nTest harness interrupted by user")
         sys.exit(130)
-    except Exception as e:
-        print(f"\nTest harness failed: {e}")
+    except Exception:
         sys.exit(1)
 
 

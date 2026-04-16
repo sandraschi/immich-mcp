@@ -9,17 +9,17 @@ Usage:
     python run_http_server.py [--host HOST] [--port PORT]
 """
 
-import sys
 import os
+import sys
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from immich_mcp.server import main
 
 if __name__ == "__main__":
     # Set default arguments for HTTP mode
     if len(sys.argv) == 1:
-        sys.argv.extend(['--transport', 'http'])
+        sys.argv.extend(["--transport", "http"])
 
     main()

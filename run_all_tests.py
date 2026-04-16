@@ -30,32 +30,21 @@ class UnifiedTestRunner:
 
     def __init__(self):
         self.results = {}
-        self.test_data = {
-            "assets": [],
-            "albums": [],
-            "start_time": None,
-            "end_time": None
-        }
+        self.test_data = {"assets": [], "albums": [], "start_time": None, "end_time": None}
 
     async def run_smoke_test(self) -> dict:
         """Quick smoke test to verify basic functionality."""
-        print("[SMOKE] Running Smoke Test...")
 
         from immich_mcp.server import server_health
 
         try:
             health = await server_health()
-            return {
-                "status": "PASS",
-                "server_version": health.server_version,
-                "is_v2_plus": health.is_v2_plus
-            }
+            return {"status": "PASS", "server_version": health.server_version, "is_v2_plus": health.is_v2_plus}
         except Exception as e:
             return {"status": "FAIL", "error": str(e)}
 
     async def run_function_tests(self) -> dict:
         """Run direct function tests."""
-        print("[FUNC] Running Function Tests...")
 
         from test_scaffold import ImmichTestScaffold
 
@@ -90,7 +79,6 @@ class UnifiedTestRunner:
 
     async def run_mcp_tests(self) -> dict:
         """Run MCP protocol tests."""
-        print("[MCP] Running MCP Protocol Tests...")
 
         from mcp_test_client import MCPTestClient
 
@@ -104,7 +92,6 @@ class UnifiedTestRunner:
 
     async def cleanup_test_data(self) -> dict:
         """Clean up test data (CAUTION: destructive)."""
-        print("[CLEAN] Cleaning up test data...")
 
         # This would be implemented to safely remove test albums/assets
         # For now, just return status
@@ -114,33 +101,22 @@ class UnifiedTestRunner:
         """Run complete test suite based on arguments."""
         self.test_data["start_time"] = datetime.now()
 
-        print("[TARGET] Immich MCP Unified Test Suite")
-        print("=" * 50)
-
-        results = {
-            "timestamp": datetime.now().isoformat(),
-            "test_config": vars(args),
-            "test_results": {}
-        }
+        results = {"timestamp": datetime.now().isoformat(), "test_config": vars(args), "test_results": {}}
 
         # Smoke test (always run)
         if not args.mcp_only:
-            print("\n" + "-"*30 + " SMOKE TEST " + "-"*30)
             results["test_results"]["smoke_test"] = await self.run_smoke_test()
 
         # Function tests
         if not args.mcp_only:
-            print("\n" + "-"*30 + " FUNCTION TESTS " + "-"*30)
             results["test_results"]["function_tests"] = await self.run_function_tests()
 
         # MCP tests
         if not args.funcs_only:
-            print("\n" + "-"*30 + " MCP PROTOCOL TESTS " + "-"*30)
             results["test_results"]["mcp_tests"] = await self.run_mcp_tests()
 
         # Cleanup
         if args.cleanup:
-            print("\n" + "-"*30 + " CLEANUP " + "-"*30)
             results["test_results"]["cleanup"] = await self.cleanup_test_data()
 
         self.test_data["end_time"] = datetime.now()
@@ -155,13 +131,7 @@ class UnifiedTestRunner:
 
     def generate_summary(self, results: dict) -> dict:
         """Generate test summary."""
-        summary = {
-            "total_tests": 0,
-            "passed": 0,
-            "failed": 0,
-            "skipped": 0,
-            "success_rate": "0%"
-        }
+        summary = {"total_tests": 0, "passed": 0, "failed": 0, "skipped": 0, "success_rate": "0%"}
 
         def count_results(data):
             if isinstance(data, dict):
@@ -193,40 +163,24 @@ class UnifiedTestRunner:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"test_results_{timestamp}.json"
 
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(results, f, indent=2, default=str)
 
-        print(f"\n[SAVE] Results saved to: {filename}")
-
         # Also save latest results
-        with open("latest_test_results.json", 'w') as f:
+        with open("latest_test_results.json", "w") as f:
             json.dump(results, f, indent=2, default=str)
 
     def print_summary(self, results: dict):
         """Print human-readable summary."""
-        summary = results["summary"]
-
-        print("\n" + "="*60)
-        print("[TARGET] TEST SUITE SUMMARY")
-        print("="*60)
-        print(f"Total Tests: {summary['total_tests']}")
-        print(f"Passed:      {summary['passed']}")
-        print(f"Failed:      {summary['failed']}")
-        print(f"Skipped:     {summary['skipped']}")
-        print(f"Success:     {summary['success_rate']}")
-        print("="*60)
+        results["summary"]
 
         if self.test_data["assets"]:
-            print(f"📸 Assets Created: {len(self.test_data['assets'])}")
+            pass
         if self.test_data["albums"]:
-            print(f"📁 Albums Created: {len(self.test_data['albums'])}")
+            pass
 
-        duration = None
         if self.test_data["start_time"] and self.test_data["end_time"]:
-            duration = self.test_data["end_time"] - self.test_data["start_time"]
-            print(f"[TIME]  Duration: {duration.total_seconds():.1f}s")
-
-        print("="*60)
+            self.test_data["end_time"] - self.test_data["start_time"]
 
 
 def main():
@@ -241,12 +195,13 @@ def main():
 
     # Handle quick test
     if args.quick:
+
         async def quick_test():
             runner = UnifiedTestRunner()
             result = await runner.run_smoke_test()
-            print(f"Smoke Test: {'✅ PASS' if result['status'] == 'PASS' else '❌ FAIL'}")
             if result["status"] == "FAIL":
-                print(f"Error: {result.get('error', 'Unknown')}")
+                pass
+
         asyncio.run(quick_test())
         return
 

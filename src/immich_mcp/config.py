@@ -21,6 +21,7 @@ else:
 @dataclass
 class ImmichUser:
     """Configuration for a single Immich user"""
+
     name: str
     api_key: str
     role: str = "user"  # admin, user, shared
@@ -68,10 +69,7 @@ class ImmichConfig:
         # For backward compatibility, create default user if api_key is provided
         if self.api_key and not self.users:
             self.users["default"] = ImmichUser(
-                name="default",
-                api_key=self.api_key,
-                role="admin",
-                description="Default user (legacy configuration)"
+                name="default", api_key=self.api_key, role="admin", description="Default user (legacy configuration)"
             )
             self.active_user = "default"
 
@@ -119,12 +117,7 @@ class ImmichConfig:
                         name, api_key = parts[0], parts[1]
                         role = parts[2] if len(parts) > 2 else "user"
                         description = parts[3] if len(parts) > 3 else ""
-                        users[name] = ImmichUser(
-                            name=name,
-                            api_key=api_key,
-                            role=role,
-                            description=description
-                        )
+                        users[name] = ImmichUser(name=name, api_key=api_key, role=role, description=description)
 
         # Legacy single-user support
         api_key = os.getenv("IMMICH_API_KEY", "")

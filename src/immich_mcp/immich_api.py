@@ -43,9 +43,7 @@ class ImmichAPIClient:
                         description="Legacy single-user mode",
                     )
                 else:
-                    raise ValueError(
-                        "No valid user configuration found. Set IMMICH_API_KEY or IMMICH_USERS."
-                    ) from e
+                    raise ValueError("No valid user configuration found. Set IMMICH_API_KEY or IMMICH_USERS.") from e
         elif config.api_key:
             # Legacy single-user mode
             self.current_user = ImmichUser(
@@ -102,9 +100,7 @@ class ImmichAPIClient:
         except Exception as e:
             raise ImmichAPIError(f"GET {endpoint} failed: {e}") from e
 
-    async def _post(
-        self, endpoint: str, data: dict | None = None, files: dict | None = None
-    ) -> dict:
+    async def _post(self, endpoint: str, data: dict | None = None, files: dict | None = None) -> dict:
         """Make POST request to Immich API
 
         Handles v2.0.0+ error response formats with improved error messages.
@@ -113,9 +109,7 @@ class ImmichAPIClient:
             url = f"{self.base_url}/api{endpoint}"
             if files:
                 # Remove Content-Type for multipart uploads
-                headers = {
-                    k: v for k, v in self.client.headers.items() if k.lower() != "content-type"
-                }
+                headers = {k: v for k, v in self.client.headers.items() if k.lower() != "content-type"}
                 response = await self.client.post(url, data=data, files=files, headers=headers)
             else:
                 response = await self.client.post(url, json=data)
@@ -422,9 +416,7 @@ class ImmichAPIClient:
                 }
             raise
 
-    async def organize_photos_by_date(
-        self, asset_ids: list[str], organization_type: str = "year_month"
-    ) -> dict:
+    async def organize_photos_by_date(self, asset_ids: list[str], organization_type: str = "year_month") -> dict:
         """Organize photos into date-based albums"""
         albums_created = 0
         photos_organized = 0
@@ -509,9 +501,7 @@ class ImmichAPIClient:
 
     # ====== ALBUM MANAGEMENT ======
 
-    async def create_album(
-        self, name: str, description: str | None = None, asset_ids: list[str] | None = None
-    ) -> dict:
+    async def create_album(self, name: str, description: str | None = None, asset_ids: list[str] | None = None) -> dict:
         """Create a new album"""
         data = {"albumName": name, "description": description or "", "assetIds": asset_ids or []}
         return await self._post("/albums", data=data)
@@ -531,9 +521,7 @@ class ImmichAPIClient:
             "errors": [],
         }
 
-    async def get_albums(
-        self, *, shared: bool | None = None, include_stats: bool = True
-    ) -> list[dict]:
+    async def get_albums(self, *, shared: bool | None = None, include_stats: bool = True) -> list[dict]:
         """Get all albums"""
         params = {}
         if shared is not None:
@@ -544,13 +532,13 @@ class ImmichAPIClient:
 
         # Add stats if requested
         if include_stats:
+            from contextlib import suppress
+
             for album in albums:
-                try:
+                with suppress(Exception):
                     # Get detailed album info
                     detailed = await self._get(f"/albums/{album['id']}")
                     album.update(detailed)
-                except Exception:
-                    pass  # Continue without detailed stats
 
         return albums
 
@@ -584,9 +572,7 @@ class ImmichAPIClient:
 
     # ====== PEOPLE & FACES ======
 
-    async def run_face_detection(
-        self, asset_ids: list[str] | None = None, *, force_reprocess: bool = False
-    ) -> dict:
+    async def run_face_detection(self, asset_ids: list[str] | None = None, *, force_reprocess: bool = False) -> dict:
         """Run face detection on photos"""
         # Trigger face detection job
         data = {"name": "FACE_DETECTION", "data": {"assetIds": asset_ids, "force": force_reprocess}}
@@ -601,9 +587,7 @@ class ImmichAPIClient:
             "people_found": [],
         }
 
-    async def update_person(
-        self, person_id: str, name: str, face_asset_ids: list[str] | None = None
-    ) -> dict:
+    async def update_person(self, person_id: str, name: str, face_asset_ids: list[str] | None = None) -> dict:
         """Update person with name and merge faces"""
         data = {"name": name}
 
@@ -670,24 +654,19 @@ class ImmichAPIClient:
 
             # Get basic asset count from search endpoint
             asset_count = 0
-            try:
-                search_result = await self._get(
-                    "/search/metadata", params={"page": 1, "size": 1, "type": "ASSET"}
-                )
+            from contextlib import suppress
+
+            with suppress(Exception):
+                search_result = await self._get("/search/metadata", params={"page": 1, "size": 1, "type": "ASSET"})
                 asset_count = search_result.get("assets", {}).get("total", 0)
-            except Exception:
-                pass
 
             # Get album count
             album_count = 0
-            try:
+            with suppress(Exception):
                 albums_result = await self._get("/albums")
-                if isinstance(albums_result, list):
-                    album_count = len(albums_result)
-                else:
-                    album_count = albums_result.get("total", 0)
-            except Exception:
-                pass
+                album_count = (
+                    len(albums_result) if isinstance(albums_result, list) else albums_result.get("total", 0)
+                )
 
             # Combine information
             return {

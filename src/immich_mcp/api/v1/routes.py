@@ -33,10 +33,7 @@ async def get_users():
         if not config:
             return {"users": [], "active_user": None}
 
-        users_list = [
-            {"name": k, "role": v.role, "description": v.description}
-            for k, v in config.users.items()
-        ]
+        users_list = [{"name": k, "role": v.role, "description": v.description} for k, v in config.users.items()]
         return {"users": users_list, "active_user": config.active_user}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -97,14 +94,20 @@ async def get_people():
         if not mcp.immich_client:
             raise HTTPException(
                 status_code=503,
-                detail="Immich client not initialized. Check .env (IMMICH_SERVER_URL, IMMICH_API_KEY) and restart the backend.",
+                detail=(
+                    "Immich client not initialized. Check .env (IMMICH_SERVER_URL, IMMICH_API_KEY) "
+                    "and restart the backend."
+                ),
             )
         people = await mcp.immich_client.get_all_people()
         return people
     except ImmichAPIError as e:
         raise _immich_error_to_http(e) from e
-    except (httpx.ConnectError, httpx.TimeoutException):
-        raise HTTPException(status_code=503, detail="Cannot reach Immich server. Check IMMICH_SERVER_URL in .env and that Immich is running.")
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Cannot reach Immich server. Check IMMICH_SERVER_URL in .env and that Immich is running.",
+        ) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -156,25 +159,30 @@ async def get_timeline(
         if not mcp.immich_client:
             raise HTTPException(
                 status_code=503,
-                detail="Immich client not initialized. Check .env (IMMICH_SERVER_URL, IMMICH_API_KEY) and restart the backend.",
+                detail=(
+                    "Immich client not initialized. Check .env (IMMICH_SERVER_URL, IMMICH_API_KEY) "
+                    "and restart the backend."
+                ),
             )
         items = await mcp.immich_client.get_timeline_assets(page=page, size=limit)
         out = []
         for photo in items:
-            out.append({
-                "id": photo.get("id", ""),
-                "original_filename": photo.get("originalFileName", "Unknown"),
-                "created_at": photo.get("createdAt", photo.get("fileCreatedAt", "")),
-                "smart_search_score": photo.get("score"),
-            })
+            out.append(
+                {
+                    "id": photo.get("id", ""),
+                    "original_filename": photo.get("originalFileName", "Unknown"),
+                    "created_at": photo.get("createdAt", photo.get("fileCreatedAt", "")),
+                    "smart_search_score": photo.get("score"),
+                }
+            )
         return out
     except ImmichAPIError as e:
         raise _immich_error_to_http(e) from e
-    except (httpx.ConnectError, httpx.TimeoutException):
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
         raise HTTPException(
             status_code=503,
             detail="Cannot reach Immich server. Check IMMICH_SERVER_URL in .env and that Immich is running.",
-        )
+        ) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -193,8 +201,11 @@ async def search_photos(
         return await search_tool(query, search_type, limit)
     except ImmichAPIError as e:
         raise _immich_error_to_http(e) from e
-    except (httpx.ConnectError, httpx.TimeoutException):
-        raise HTTPException(status_code=503, detail="Cannot reach Immich server. Check IMMICH_SERVER_URL in .env and that Immich is running.")
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Cannot reach Immich server. Check IMMICH_SERVER_URL in .env and that Immich is running.",
+        ) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -304,8 +315,11 @@ async def list_albums(
         return await list_tool(shared, include_stats)
     except ImmichAPIError as e:
         raise _immich_error_to_http(e) from e
-    except (httpx.ConnectError, httpx.TimeoutException):
-        raise HTTPException(status_code=503, detail="Cannot reach Immich server. Check IMMICH_SERVER_URL in .env and that Immich is running.")
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Cannot reach Immich server. Check IMMICH_SERVER_URL in .env and that Immich is running.",
+        ) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -405,7 +419,10 @@ def _immich_error_to_http(e: Exception) -> HTTPException:
     if "401" in msg or "unauthorized" in msg or "api key" in msg or "invalid" in msg or "forbidden" in msg:
         return HTTPException(
             status_code=401,
-            detail="Immich rejected the API key. Check .env IMMICH_API_KEY and that the key is valid in Immich (Administration -> API Keys).",
+            detail=(
+                "Immich rejected the API key. Check .env IMMICH_API_KEY and that the key is valid in "
+                "Immich (Administration -> API Keys)."
+            ),
         )
     if "connection" in msg or "refused" in msg or "timeout" in msg or "cannot connect" in msg or "network" in msg:
         return HTTPException(
@@ -494,7 +511,9 @@ async def list_mcp_tools():
         for t in tool_list:
             name = getattr(t, "name", None) or getattr(t, "title", str(t))
             desc = getattr(t, "description", "") or ""
-            params = getattr(t, "parameters", None) or getattr(t, "inputSchema", {}) or getattr(t, "input_schema", {}) or {}
+            params = (
+                getattr(t, "parameters", None) or getattr(t, "inputSchema", {}) or getattr(t, "input_schema", {}) or {}
+            )
             tools.append({"name": name, "description": desc, "parameters": params})
         return {"success": True, "tools": tools}
     except Exception:
@@ -505,7 +524,8 @@ async def list_mcp_tools():
 HELP_CONTENT: dict[str, str] = {
     "overview": (
         "Immich MCP Server provides photo library management through the Model Context Protocol. "
-        "Use the webapp to browse timeline photos, search, view albums and people, and see geotagged assets on the map. "
+        "Use the webapp to browse timeline photos, search, view albums and people, "
+        "and see geotagged assets on the map. "
         "Configure Immich server URL and API key in Settings."
     ),
     "photos": (
@@ -515,19 +535,19 @@ HELP_CONTENT: dict[str, str] = {
     "albums": (
         "Albums list and manage your Immich albums. Create albums, add or remove assets, and share albums via the API."
     ),
-    "people": (
-        "People and face recognition data from Immich. View detected people and link faces to names."
-    ),
+    "people": ("People and face recognition data from Immich. View detected people and link faces to names."),
     "map": (
-        "Map view shows assets that have GPS (EXIF) data. If the map is empty, ensure photos have location metadata and "
-        "Immich has processed them. The backend calls Immich /map/markers."
+        "Map view shows assets that have GPS (EXIF) data. If the map is empty, "
+        "ensure photos have location metadata and Immich has processed them. "
+        "The backend calls Immich /map/markers."
     ),
     "tools": (
         "MCP Tools are listed from the running FastMCP server. If the list is empty, the backend may not be connected "
         "to the MCP process or list_tools may be unavailable. Health and storage endpoints work independently."
     ),
     "settings": (
-        "Set Immich server URL, API key, and optional multi-user config. Restart the backend after changing env or config."
+        "Set Immich server URL, API key, and optional multi-user config. "
+        "Restart the backend after changing env or config."
     ),
 }
 

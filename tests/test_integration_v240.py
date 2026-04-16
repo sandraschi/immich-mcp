@@ -4,11 +4,10 @@ Tests against real Immich v2.4.0 server to verify API changes work correctly
 Austrian efficiency: Real integration testing, no mocks for critical paths
 """
 
-import pytest
-import asyncio
 import os
-from pathlib import Path
-from typing import Dict, Any, List
+from contextlib import suppress
+
+import pytest
 
 from immich_mcp.config import ImmichConfig
 from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError
@@ -29,7 +28,7 @@ class TestImmichV240Integration:
         return ImmichConfig(
             server_url=server_url,
             api_key=api_key,
-            timeout=60  # Longer timeout for real server
+            timeout=60,  # Longer timeout for real server
         )
 
     @pytest.fixture(scope="session")
@@ -39,8 +38,7 @@ class TestImmichV240Integration:
 
         # Test connection
         try:
-            server_info = await client.get_server_info()
-            print(f"Connected to Immich server: {server_info.get('version', 'Unknown')}")
+            await client.get_server_info()
         except Exception as e:
             pytest.skip(f"Cannot connect to Immich server: {e}")
 
@@ -53,11 +51,7 @@ class TestImmichV240Integration:
         async def test_search_metadata_basic(self, api_client):
             """Test basic search/metadata endpoint functionality"""
             try:
-                result = await api_client._get("/search/metadata", params={
-                    "page": 1,
-                    "size": 10,
-                    "type": "ASSET"
-                })
+                result = await api_client._get("/search/metadata", params={"page": 1, "size": 10, "type": "ASSET"})
 
                 # Verify response structure
                 assert "assets" in result
@@ -67,8 +61,6 @@ class TestImmichV240Integration:
                 assert "count" in result["assets"]
                 assert "items" in result["assets"]
                 assert isinstance(result["assets"]["items"], list)
-
-                print(f"Found {result['assets']['total']} total assets")
 
             except ImmichAPIError as e:
                 pytest.fail(f"Search/metadata endpoint failed: {e}")
@@ -88,11 +80,9 @@ class TestImmichV240Integration:
                     assert "type" in asset
                     assert "originalFileName" in asset
 
-                print(f"Smart search returned {len(result)} results")
-
-            except ImmichAPIError as e:
+            except ImmichAPIError:
                 # Smart search might not be available or configured
-                print(f"Smart search not available (expected): {e}")
+                pass
 
         @pytest.mark.asyncio
         async def test_filename_search_via_metadata(self, api_client):
@@ -106,9 +96,8 @@ class TestImmichV240Integration:
                         # Search for that filename
                         result = await api_client.search_photos(filename, search_type="filename", limit=5)
                         assert isinstance(result, list)
-                        print(f"Filename search for '{filename}' returned {len(result)} results")
                 else:
-                    print("No assets found to test filename search")
+                    pass
 
             except ImmichAPIError as e:
                 pytest.fail(f"Filename search failed: {e}")
@@ -131,14 +120,14 @@ class TestImmichV240Integration:
                         pytest.fail("Individual asset access should not work in v2.4.0")
                     except ImmichAPIError as e:
                         if "404" in str(e) or "not found" in str(e).lower():
-                            print("✓ Individual asset access correctly blocked in v2.4.0")
+                            pass
                         else:
                             raise
                 else:
-                    print("No assets found to test individual access")
+                    pass
 
-            except ImmichAPIError as e:
-                print(f"Asset access test inconclusive: {e}")
+            except ImmichAPIError:
+                pass
 
         @pytest.mark.asyncio
         async def test_get_asset_info_fallback_works(self, api_client):
@@ -156,10 +145,8 @@ class TestImmichV240Integration:
                     assert "originalFileName" in asset_info
                     assert "type" in asset_info
 
-                    print(f"✓ Asset info fallback works for asset {asset_id}")
-
                 else:
-                    print("No assets found to test asset info fallback")
+                    pass
 
             except ImmichAPIError as e:
                 pytest.fail(f"Asset info fallback failed: {e}")
@@ -178,9 +165,6 @@ class TestImmichV240Integration:
             assert server_info["api_architecture"] == "search_based"
             assert server_info["individual_asset_access"] is False
 
-            print(f"✓ Server version detected: {server_info.get('version', 'Unknown')}")
-            print(f"✓ API architecture: {server_info['api_architecture']}")
-
         @pytest.mark.asyncio
         async def test_server_stats_adapt_to_v240(self, api_client):
             """Test that server stats work without /server-info endpoint"""
@@ -191,8 +175,6 @@ class TestImmichV240Integration:
             assert "albums" in server_stats
             assert "api_version" in server_stats
             assert server_stats["api_version"] == "2.4.0+"
-
-            print(f"✓ Server stats adapted for v2.4.0: {server_stats['photos']} photos, {server_stats['albums']} albums")
 
     class TestBackwardCompatibility:
         """Test that existing functionality still works"""
@@ -209,8 +191,6 @@ class TestImmichV240Integration:
                     assert "id" in album
                     assert "albumName" in album
 
-                print(f"✓ Albums API works: {len(albums)} albums found")
-
             except ImmichAPIError as e:
                 pytest.fail(f"Albums API failed: {e}")
 
@@ -226,12 +206,8 @@ class TestImmichV240Integration:
                 assert "id" in album
 
                 # Clean up
-                try:
+                with suppress(Exception):
                     await api_client._delete(f"/albums/{album['id']}")
-                except:
-                    pass  # Cleanup might fail, but that's ok for test
-
-                print(f"✓ Album creation works: {album_name}")
 
             except ImmichAPIError as e:
                 pytest.fail(f"Album creation failed: {e}")
@@ -246,11 +222,9 @@ class TestImmichV240Integration:
 
             # OCR detection should work
             has_ocr = server_info.get("has_ocr", False)
-            print(f"✓ OCR capability detected: {has_ocr}")
 
             if has_ocr:
-                print(f"✓ Multilingual OCR: {server_info.get('has_multilingual_ocr', False)}")
-                print(f"✓ OCR languages: {server_info.get('ocr_languages', [])}")
+                pass
 
         @pytest.mark.asyncio
         async def test_ocr_search_functionality(self, api_client):
@@ -261,13 +235,13 @@ class TestImmichV240Integration:
                 assert isinstance(results, list)
 
                 if len(results) > 0:
-                    print(f"✓ OCR search works: {len(results)} results found")
+                    pass
                 else:
-                    print("✓ OCR search works: no results (expected for test query)")
+                    pass
 
             except ImmichAPIError as e:
                 if "not found" in str(e).lower() or "404" in str(e):
-                    print("✓ OCR search correctly falls back when not available")
+                    pass
                 else:
                     raise
 
@@ -282,14 +256,12 @@ class TestImmichV240Integration:
             # Test small result set
             start_time = time.time()
             results_small = await api_client.search_photos("", search_type="filename", limit=10)
-            small_time = time.time() - start_time
+            time.time() - start_time
 
             # Test larger result set
             start_time = time.time()
             results_large = await api_client.search_photos("", search_type="filename", limit=100)
-            large_time = time.time() - start_time
-
-            print(f"✓ Search performance: 10 results in {small_time:.2f}s, 100 results in {large_time:.2f}s")
+            time.time() - start_time
 
             assert isinstance(results_small, list)
             assert isinstance(results_large, list)
@@ -300,24 +272,14 @@ class TestImmichV240Integration:
         async def test_pagination_behavior(self, api_client):
             """Test pagination behavior of search endpoint"""
             # Get first page
-            page1 = await api_client._get("/search/metadata", params={
-                "page": 1,
-                "size": 20,
-                "type": "ASSET"
-            })
+            page1 = await api_client._get("/search/metadata", params={"page": 1, "size": 20, "type": "ASSET"})
 
             # Get second page
-            page2 = await api_client._get("/search/metadata", params={
-                "page": 2,
-                "size": 20,
-                "type": "ASSET"
-            })
+            page2 = await api_client._get("/search/metadata", params={"page": 2, "size": 20, "type": "ASSET"})
 
-            total_assets = page1["assets"]["total"]
+            page1["assets"]["total"]
             page1_count = len(page1["assets"]["items"])
             page2_count = len(page2["assets"]["items"])
-
-            print(f"✓ Pagination works: {total_assets} total, page1: {page1_count}, page2: {page2_count}")
 
             assert page1_count <= 20
             assert page2_count <= 20
@@ -333,7 +295,6 @@ class TestImmichV240Integration:
                 pytest.fail("Should have raised an error for invalid asset ID")
             except ImmichAPIError as e:
                 assert "not found" in str(e).lower()
-                print("✓ Invalid asset ID correctly handled")
 
         @pytest.mark.asyncio
         async def test_network_error_recovery(self, api_client):
@@ -343,9 +304,8 @@ class TestImmichV240Integration:
                 # Try a search with very short timeout (if configurable)
                 results = await api_client.search_photos("", search_type="filename", limit=1)
                 assert isinstance(results, list)
-                print("✓ Network error recovery works")
-            except ImmichAPIError as e:
-                print(f"Network test inconclusive: {e}")
+            except ImmichAPIError:
+                pass
 
 
 class TestImmichMCPFullIntegration:
@@ -357,7 +317,7 @@ class TestImmichMCPFullIntegration:
         try:
             assets = await api_client.search_photos("", search_type="filename", limit=5)
             return assets
-        except:
+        except Exception:
             return []
 
     @pytest.mark.asyncio
@@ -384,15 +344,16 @@ class TestImmichMCPFullIntegration:
         server_stats = await api_client.get_server_stats()
         assert "photos" in server_stats
 
-        print("✓ Complete ImmichMCP v2.4.0 workflow works")
-
 
 if __name__ == "__main__":
     # Run integration tests
     # Requires IMMICH_SERVER_URL and IMMICH_API_KEY environment variables
-    pytest.main([
-        __file__,
-        "-v",
-        "--tb=short",
-        "-k", "not test_complete_workflow"  # Skip long-running tests by default
-    ])
+    pytest.main(
+        [
+            __file__,
+            "-v",
+            "--tb=short",
+            "-k",
+            "not test_complete_workflow",  # Skip long-running tests by default
+        ]
+    )

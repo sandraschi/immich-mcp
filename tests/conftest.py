@@ -1,11 +1,10 @@
 """
 Pytest configuration and fixtures for ImmichMCP tests.
 """
+
 import asyncio
-import os
 from pathlib import Path
-from typing import AsyncGenerator, Generator
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -27,6 +26,7 @@ TEST_CONFIG = {
     "immich_max_retries": 2,
 }
 
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an instance of the default event loop for the test session."""
@@ -35,17 +35,18 @@ def event_loop():
     yield loop
     loop.close()
 
+
 @pytest.fixture(autouse=True)
 def mock_settings(monkeypatch, tmp_path):
     """Override settings for all tests."""
     # Set environment variables
     for key, value in TEST_CONFIG.items():
         monkeypatch.setenv(f"IMMICH_MCP_{key.upper()}", str(value))
-    
+
     # Create test directories
     upload_dir = tmp_path / "uploads"
     upload_dir.mkdir()
-    
+
     # Patch settings
     with patch("immich_mcp.settings.Settings") as mock_settings:
         settings = get_settings()
@@ -55,23 +56,25 @@ def mock_settings(monkeypatch, tmp_path):
         mock_settings.return_value = settings
         yield settings
 
+
 @pytest.fixture
 def mock_immich_client():
     """Create a mock Immich API client."""
-    with patch('immich_mcp.immich_api.ImmichAPIClient') as mock:
+    with patch("immich_mcp.immich_api.ImmichAPIClient") as mock:
         client = AsyncMock(spec=ImmichAPIClient)
         client.base_url = TEST_CONFIG["immich_url"]
         client.api_key = TEST_CONFIG["immich_api_key"]
-        
+
         # Set up mock methods
         client.initialize = AsyncMock(return_value=None)
         client.close = AsyncMock(return_value=None)
         client.search_photos = AsyncMock(return_value=[])
         client.upload_photo = AsyncMock(return_value={"id": "test-photo-id"})
         client.get_photo_info = AsyncMock(return_value={"id": "test-photo-id"})
-        
+
         mock.return_value = client
         yield client
+
 
 @pytest.fixture
 def test_app(mock_immich_client, mock_settings):
@@ -82,19 +85,21 @@ def test_app(mock_immich_client, mock_settings):
         version=mock_settings.app_version,
         description="Test ImmichMCP server",
     )
-    
+
     app = ImmichMCP(config=config)
-    
+
     # Store the mock client on the app instance for test access
     app.immich_client = mock_immich_client
-    
+
     return app
+
 
 @pytest.fixture
 def test_client(test_app):
     """Create a test client for the FastAPI app."""
     with TestClient(test_app.app) as client:
         yield client
+
 
 @pytest.fixture
 def test_photo(tmp_path) -> Path:

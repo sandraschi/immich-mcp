@@ -4,11 +4,9 @@ Tests all API changes and endpoint migrations from v2.4.0 migration
 Austrian efficiency: Thorough testing with multiple scenarios
 """
 
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-import asyncio
-from unittest.mock import Mock, patch, AsyncMock
-from datetime import datetime
-import httpx
 
 from immich_mcp.config import ImmichConfig
 from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError
@@ -20,11 +18,7 @@ class TestImmichAPIV240Compatibility:
     @pytest.fixture
     def config(self):
         """Create test configuration"""
-        return ImmichConfig(
-            server_url="http://localhost:2283",
-            api_key="test_api_key_12345",
-            timeout=30
-        )
+        return ImmichConfig(server_url="http://localhost:2283", api_key="test_api_key_12345", timeout=30)
 
     @pytest.fixture
     def api_client(self, config):
@@ -54,29 +48,27 @@ class TestImmichAPIV240Compatibility:
                             "id": "asset1",
                             "type": "IMAGE",
                             "originalFileName": "test1.jpg",
-                            "fileCreatedAt": "2024-01-01T00:00:00.000Z"
+                            "fileCreatedAt": "2024-01-01T00:00:00.000Z",
                         },
                         {
                             "id": "asset2",
                             "type": "IMAGE",
                             "originalFileName": "test2.jpg",
-                            "fileCreatedAt": "2024-01-02T00:00:00.000Z"
-                        }
-                    ]
-                }
+                            "fileCreatedAt": "2024-01-02T00:00:00.000Z",
+                        },
+                    ],
+                },
             }
 
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 mock_get.return_value = mock_response.json()
 
                 result = await api_client.search_photos("test query", search_type="smart")
 
                 # Verify correct endpoint and parameters
-                mock_get.assert_called_with("/search/smart", params={
-                    "query": "test query",
-                    "limit": 50,
-                    "type": "SMART_SEARCH"
-                })
+                mock_get.assert_called_with(
+                    "/search/smart", params={"query": "test query", "limit": 50, "type": "SMART_SEARCH"}
+                )
 
                 assert len(result) == 2
                 assert result[0]["id"] == "asset1"
@@ -95,24 +87,21 @@ class TestImmichAPIV240Compatibility:
                             "id": "asset1",
                             "type": "IMAGE",
                             "originalFileName": "vacation_test.jpg",
-                            "fileCreatedAt": "2024-01-01T00:00:00.000Z"
+                            "fileCreatedAt": "2024-01-01T00:00:00.000Z",
                         }
-                    ]
-                }
+                    ],
+                },
             }
 
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 mock_get.return_value = mock_response.json()
 
                 result = await api_client.search_photos("vacation", search_type="filename")
 
                 # Verify correct endpoint and parameters for filename search
-                mock_get.assert_called_with("/search/metadata", params={
-                    "page": 1,
-                    "size": 50,
-                    "query": "vacation",
-                    "type": "ASSET"
-                })
+                mock_get.assert_called_with(
+                    "/search/metadata", params={"page": 1, "size": 50, "query": "vacation", "type": "ASSET"}
+                )
 
                 assert len(result) == 1
                 assert result[0]["originalFileName"] == "vacation_test.jpg"
@@ -130,22 +119,19 @@ class TestImmichAPIV240Compatibility:
                             "id": "asset1",
                             "type": "IMAGE",
                             "originalFileName": "metadata_test.jpg",
-                            "fileCreatedAt": "2024-01-01T00:00:00.000Z"
+                            "fileCreatedAt": "2024-01-01T00:00:00.000Z",
                         }
-                    ]
-                }
+                    ],
+                },
             }
 
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 mock_get.return_value = mock_response.json()
 
                 result = await api_client.search_photos("metadata query", search_type="metadata")
 
                 # Verify correct endpoint and parameters for metadata search
-                mock_get.assert_called_with("/search/metadata", params={
-                    "q": "metadata query",
-                    "limit": 50
-                })
+                mock_get.assert_called_with("/search/metadata", params={"q": "metadata query", "limit": 50})
 
                 assert len(result) == 1
 
@@ -165,24 +151,21 @@ class TestImmichAPIV240Compatibility:
                             "id": "test-asset-123",
                             "type": "IMAGE",
                             "originalFileName": "test.jpg",
-                            "fileCreatedAt": "2024-01-01T00:00:00.000Z"
+                            "fileCreatedAt": "2024-01-01T00:00:00.000Z",
                         }
-                    ]
-                }
+                    ],
+                },
             }
 
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 mock_get.return_value = mock_response.json()
 
                 result = await api_client.get_asset_info("test-asset-123")
 
                 # Verify correct endpoint and parameters
-                mock_get.assert_called_with("/search/metadata", params={
-                    "page": 1,
-                    "size": 1,
-                    "query": "test-asset-123",
-                    "type": "ASSET"
-                })
+                mock_get.assert_called_with(
+                    "/search/metadata", params={"page": 1, "size": 1, "query": "test-asset-123", "type": "ASSET"}
+                )
 
                 assert result["id"] == "test-asset-123"
                 assert result["originalFileName"] == "test.jpg"
@@ -191,10 +174,7 @@ class TestImmichAPIV240Compatibility:
         async def test_get_asset_info_fallback_search(self, api_client, mock_response):
             """Test asset info retrieval requiring broader search fallback"""
             # First call returns no results with query
-            empty_response = {
-                "albums": {"total": 0, "items": []},
-                "assets": {"total": 0, "count": 0, "items": []}
-            }
+            empty_response = {"albums": {"total": 0, "items": []}, "assets": {"total": 0, "count": 0, "items": []}}
 
             # Second call returns the asset
             found_response = {
@@ -207,13 +187,14 @@ class TestImmichAPIV240Compatibility:
                             "id": "test-asset-123",
                             "type": "IMAGE",
                             "originalFileName": "test.jpg",
-                            "fileCreatedAt": "2024-01-01T00:00:00.000Z"
+                            "fileCreatedAt": "2024-01-01T00:00:00.000Z",
                         }
-                    ] + [{"id": f"other-{i}", "type": "IMAGE"} for i in range(999)]
-                }
+                    ]
+                    + [{"id": f"other-{i}", "type": "IMAGE"} for i in range(999)],
+                },
             }
 
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 mock_get.side_effect = [empty_response, found_response]
 
                 result = await api_client.get_asset_info("test-asset-123")
@@ -234,10 +215,10 @@ class TestImmichAPIV240Compatibility:
             """Test asset info retrieval when asset doesn't exist"""
             mock_response.json.return_value = {
                 "albums": {"total": 0, "items": []},
-                "assets": {"total": 0, "count": 0, "items": []}
+                "assets": {"total": 0, "count": 0, "items": []},
             }
 
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 mock_get.return_value = mock_response.json()
 
                 with pytest.raises(ImmichAPIError) as exc_info:
@@ -252,37 +233,34 @@ class TestImmichAPIV240Compatibility:
         async def test_get_server_stats_without_server_info(self, api_client):
             """Test server stats when /server-info endpoint doesn't exist"""
             # Mock search endpoint to return asset count
-            search_response = {
-                "albums": {"total": 0, "items": []},
-                "assets": {"total": 150, "count": 150, "items": []}
-            }
+            search_response = {"albums": {"total": 0, "items": []}, "assets": {"total": 150, "count": 150, "items": []}}
 
             # Mock albums endpoint to return album count
             albums_response = [
                 {"id": "album1", "albumName": "Test Album 1"},
-                {"id": "album2", "albumName": "Test Album 2"}
+                {"id": "album2", "albumName": "Test Album 2"},
             ]
 
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 # Mock /server-info to fail (404)
                 mock_get.side_effect = [
                     ImmichAPIError("GET /server-info failed - HTTP 404"),  # server-info fails
                     search_response,  # search/metadata succeeds
-                    albums_response   # albums succeeds
+                    albums_response,  # albums succeeds
                 ]
 
                 result = await api_client.get_server_stats()
 
                 # Verify results include v2.4.0 indicators
                 assert result["photos"] == 150  # From search endpoint
-                assert result["albums"] == 2    # From albums endpoint
+                assert result["albums"] == 2  # From albums endpoint
                 assert result["api_version"] == "2.4.0+"
 
         @pytest.mark.asyncio
         async def test_get_server_info_v240_detection(self, api_client):
             """Test server info detection for v2.4.0+"""
             # Mock all endpoints to simulate v2.4.0 behavior
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 # Mock /server-info to fail (doesn't exist in v2.4.0)
                 mock_get.side_effect = ImmichAPIError("GET /server-info failed - HTTP 404")
 
@@ -298,15 +276,13 @@ class TestImmichAPIV240Compatibility:
         async def test_get_server_info_with_ocr_capability(self, api_client):
             """Test server info with OCR capability detection"""
             # Mock OCR search to succeed (indicating OCR support)
-            ocr_response = {
-                "assets": {"total": 1, "count": 1, "items": []}
-            }
+            ocr_response = {"assets": {"total": 1, "count": 1, "items": []}}
 
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 # Mock /server-info to fail, then OCR search to succeed
                 mock_get.side_effect = [
                     ImmichAPIError("GET /server-info failed - HTTP 404"),  # server-info fails
-                    ocr_response  # OCR search succeeds
+                    ocr_response,  # OCR search succeeds
                 ]
 
                 result = await api_client.get_server_info()
@@ -324,15 +300,10 @@ class TestImmichAPIV240Compatibility:
         async def test_albums_endpoints_still_work(self, api_client, mock_response):
             """Test that albums endpoints are unchanged in v2.4.0"""
             mock_response.json.return_value = [
-                {
-                    "id": "album1",
-                    "albumName": "Test Album",
-                    "description": "Test description",
-                    "assetCount": 10
-                }
+                {"id": "album1", "albumName": "Test Album", "description": "Test description", "assetCount": 10}
             ]
 
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 mock_get.return_value = mock_response.json()
 
                 result = await api_client.get_albums()
@@ -348,26 +319,24 @@ class TestImmichAPIV240Compatibility:
                 "id": "new_album_123",
                 "albumName": "New Album",
                 "description": "Created album",
-                "assetCount": 0
+                "assetCount": 0,
             }
 
-            with patch.object(api_client, '_post', new_callable=AsyncMock) as mock_post:
+            with patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post:
                 mock_post.return_value = mock_response.json()
 
                 result = await api_client.create_album("New Album", "Created album")
 
-                mock_post.assert_called_with("/albums", data={
-                    "albumName": "New Album",
-                    "description": "Created album",
-                    "assetIds": []
-                })
+                mock_post.assert_called_with(
+                    "/albums", data={"albumName": "New Album", "description": "Created album", "assetIds": []}
+                )
                 assert result["albumName"] == "New Album"
 
         @pytest.mark.asyncio
         async def test_upload_endpoints_still_work(self, api_client):
             """Test that upload endpoints are unchanged"""
             # This is harder to test fully without file mocking, but we can test the endpoint call
-            with patch.object(api_client, '_post', new_callable=AsyncMock) as mock_post:
+            with patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post:
                 mock_post.return_value = {"id": "uploaded_asset_123"}
 
                 # This would normally require actual files, so we'll just verify the endpoint
@@ -380,13 +349,13 @@ class TestImmichAPIV240Compatibility:
         @pytest.mark.asyncio
         async def test_ocr_fallback_when_not_available(self, api_client):
             """Test OCR search fallback when endpoint doesn't exist"""
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 # First call (OCR) fails with 404
                 mock_get.side_effect = [
                     ImmichAPIError("GET /search/ocr failed - HTTP 404"),  # OCR fails
                     {  # Fallback smart search succeeds
                         "assets": {"total": 1, "items": [{"id": "asset1"}]}
-                    }
+                    },
                 ]
 
                 result = await api_client.search_photos("test query", search_type="ocr")
@@ -399,7 +368,7 @@ class TestImmichAPIV240Compatibility:
         @pytest.mark.asyncio
         async def test_graceful_degradation_server_info(self, api_client):
             """Test graceful degradation when server-info doesn't exist"""
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 # All calls fail, should still return basic info
                 mock_get.side_effect = ImmichAPIError("All endpoints failed")
 
@@ -416,12 +385,12 @@ class TestImmichAPIV240Compatibility:
         @pytest.mark.asyncio
         async def test_automatic_v240_detection(self, api_client):
             """Test that API client automatically detects v2.4.0+ behavior"""
-            with patch.object(api_client, '_get', new_callable=AsyncMock) as mock_get:
+            with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
                 # Simulate v2.4.0 behavior: server-info fails, search works
                 mock_get.side_effect = [
                     ImmichAPIError("GET /server-info failed - HTTP 404"),  # No server-info
                     {"assets": {"total": 100, "items": []}},  # Search works
-                    [{"id": "album1"}]  # Albums work
+                    [{"id": "album1"}],  # Albums work
                 ]
 
                 server_info = await api_client.get_server_info()
@@ -439,11 +408,7 @@ class TestImmichMCPIntegration:
     @pytest.fixture
     def server_config(self):
         """Create test server configuration"""
-        return {
-            "server_url": "http://localhost:2283",
-            "api_key": "test_api_key_12345",
-            "timeout": 30
-        }
+        return {"server_url": "http://localhost:2283", "api_key": "test_api_key_12345", "timeout": 30}
 
     def test_server_initialization(self, server_config):
         """Test that server initializes correctly with v2.4.0 config"""

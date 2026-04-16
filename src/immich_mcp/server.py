@@ -1,7 +1,8 @@
 """
-ImmichMCP - FastMCP 3.1 Server for Immich Photo Management
+ImmichMCP - Industrialized FastMCP 3.2.0 Server for Immich Photo Management
 
 Efficient Immich photo library management via MCP. 25+ tools: photo ops, albums, people/faces, library and admin.
+SOTA 2026 fleet standard implementation.
 """
 
 # CRITICAL: Set stdio to binary mode on Windows for Antigravity IDE compatibility
@@ -53,7 +54,7 @@ _is_stdio_mode = not sys.stdout.isatty()
 
 # NUCLEAR OPTION: Completely disable logger during stdio mode
 # Import logger first, then replace it with a no-op to prevent any stdout writes
-import logging
+import logging  # noqa: E402
 
 if _is_stdio_mode:
     # Replace stdout with our devnull version to catch any accidental writes
@@ -65,10 +66,10 @@ if _is_stdio_mode:
     # protocol that uses stdout.
     pass
 
-import asyncio
-from pathlib import Path
+import asyncio  # noqa: E402
+from pathlib import Path  # noqa: E402
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # noqa: E402
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -110,11 +111,11 @@ class ImmichMCP(FastMCP):
     def __init__(self, **kwargs):
         """Initialize the ImmichMCP server."""
         kwargs.setdefault("name", "ImmichMCP")
-        kwargs.setdefault("version", "1.0.0")
+        kwargs.setdefault("version", "1.5.0")
         super().__init__(
             name=kwargs["name"],
             version=kwargs["version"],
-            instructions="""You are ImmichMCP, a comprehensive FastMCP 3.1 server for Immich photo management.
+            instructions="""You are ImmichMCP, an industrialized FastMCP 3.2.0 server for Immich photo management.
 
 CORE CAPABILITIES:
 - Photo Management: Browse, search, upload, and organize your Immich photo library
@@ -122,6 +123,12 @@ CORE CAPABILITIES:
 - People & Faces: Face recognition, person identification, and facial clustering
 - Library Administration: Multi-user support, library management, and user permissions
 - Asset Organization: Tagging, metadata management, and advanced search capabilities
+
+SOTA 2026 FEATURES:
+- Full FastMCP 3.2.0 parity with native sampling and agentic orchestration
+- Industrialized Biome-stabilized dashboard at port 10795
+- Protocol-hardened JSON-RPC stream for Antigravity IDE compatibility
+- High-fidelity metadata extraction and OCR-powered intelligent search
 
 CONVERSATIONAL FEATURES:
 - Tools return natural language responses alongside structured data
@@ -133,8 +140,8 @@ RESPONSE FORMAT:
 - Error responses include 'error' field with descriptive message
 - Success responses include relevant data fields and natural language summaries
 
-PORTMANTEAU DESIGN:
-Tools are consolidated into logical groups. Each portmanteau tool handles multiple related operations through an 'operation' parameter.
+Tools are consolidated into logical groups. Each portmanteau tool handles multiple related operations
+through an 'operation' parameter.
 """,
         )
         self.immich_client: ImmichAPIClient | None = None
@@ -161,17 +168,16 @@ Tools are consolidated into logical groups. Each portmanteau tool handles multip
 mcp = ImmichMCP()
 
 # Register agentic workflow tools
-from .agentic import register_agentic_tools
+from .agentic import register_agentic_tools  # noqa: E402
 
 register_agentic_tools()
 
 # CRITICAL: After server initialization, restore stdout for stdio mode
-if _is_stdio_mode:
-    if hasattr(sys.stdout, "restore"):
-        sys.stdout.restore()
+if _is_stdio_mode and hasattr(sys.stdout, "restore"):
+    sys.stdout.restore()
 
 # FastMCP 3.1: separate FastAPI app for custom routes; mount MCP HTTP app at /mcp
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager  # noqa: E402
 
 
 @asynccontextmanager
@@ -185,8 +191,8 @@ async def _web_lifespan(_app: FastAPI):
 
 _web_app = FastAPI(
     title="ImmichMCP",
-    description="FastMCP 3.1 server for Immich photo management",
-    version="1.0.0",
+    description="Industrialized FastMCP 3.2.0 server for Immich photo management",
+    version="1.5.0",
     lifespan=_web_lifespan,
 )
 _web_app.include_router(v1_router, prefix="/api/v1")
@@ -216,9 +222,7 @@ class PhotoSearchResult(BaseModel):
     is_archived: bool = Field(description="Archive status")
     is_trashed: bool = Field(description="Trash status")
     checksum: str = Field(description="File checksum")
-    smart_search_score: float | None = Field(
-        default=None, description="CLIP search relevance score"
-    )
+    smart_search_score: float | None = Field(default=None, description="CLIP search relevance score")
     latitude: float | None = Field(default=None, description="GPS Latitude")
     longitude: float | None = Field(default=None, description="GPS Longitude")
 
@@ -256,9 +260,7 @@ class PhotoInfo(BaseModel):
     people: list[str] = Field(default_factory=list)
     albums: list[str] = Field(default_factory=list)
     ocr_text: str | None = Field(default=None, description="Extracted OCR text (v2.2.0+)")
-    ocr_bounding_boxes: list[dict[str, Any]] = Field(
-        default_factory=list, description="OCR bounding boxes (v2.3.0+)"
-    )
+    ocr_bounding_boxes: list[dict[str, Any]] = Field(default_factory=list, description="OCR bounding boxes (v2.3.0+)")
     ocr_language: str | None = Field(default=None, description="OCR language used (v2.3.0+)")
     ocr_confidence: float | None = Field(default=None, description="OCR confidence score (v2.3.0+)")
 
@@ -413,9 +415,7 @@ class HealthStatus(BaseModel):
     server_features: list[str] = Field(description="Available server features")
     is_v2_plus: bool = Field(default=False, description="Whether server is v2.0.0+")
     has_ocr: bool = Field(default=False, description="Whether server supports OCR search (v2.2.0+)")
-    has_multilingual_ocr: bool = Field(
-        default=False, description="Whether server supports multilingual OCR (v2.3.0+)"
-    )
+    has_multilingual_ocr: bool = Field(default=False, description="Whether server supports multilingual OCR (v2.3.0+)")
     ocr_languages: list[str] = Field(default_factory=list, description="Supported OCR languages")
     database_connected: bool = Field(description="Database connection status")
     redis_connected: bool = Field(description="Redis connection status")
@@ -439,8 +439,7 @@ class OcrInfo(BaseModel):
     has_bounding_boxes: bool = Field(description="Whether bounding box data is available (v2.3.0+)")
 
 
-from .immich_api import get_api_client
-
+from .immich_api import get_api_client  # noqa: E402
 
 # ====== PHASE 1: CORE PHOTO OPERATIONS (5 tools) ======
 
@@ -630,7 +629,11 @@ async def search_photos(
     limit: int = Field(50, description="Maximum results to return"),
     ocr_language: str = Field(
         default=None,
-        description="OCR language model (v2.3.0+): english, english_only, chinese_simplified, chinese_traditional, japanese, greek, korean, russian, belarusian, ukrainian, thai, latin_script_languages",
+        description=(
+            "OCR language model (v2.3.0+): english, english_only, chinese_simplified, "
+            "chinese_traditional, japanese, greek, korean, russian, belarusian, "
+            "ukrainian, thai, latin_script_languages"
+        ),
     ),
 ) -> list[PhotoSearchResult]:
     r"""Search photos using CLIP smart search, OCR text search, or metadata queries.
@@ -1046,11 +1049,10 @@ async def get_photo_info(asset_id: str) -> PhotoInfo:
 
         # Get OCR data if available (v2.2.0+)
         ocr_data = {}
-        try:
+        from contextlib import suppress
+
+        with suppress(Exception):
             ocr_data = await client.get_asset_ocr(asset_id, include_bounding_boxes=True)
-        except Exception:
-            # OCR not available or failed, continue without OCR data
-            pass
 
         return PhotoInfo(
             id=asset_id,
@@ -1102,9 +1104,7 @@ async def get_photo_info(asset_id: str) -> PhotoInfo:
 @mcp.tool()
 async def get_ocr_data(
     asset_id: str,
-    include_bounding_boxes: bool = Field(
-        default=True, description="Include bounding box coordinates"
-    ),
+    include_bounding_boxes: bool = Field(default=True, description="Include bounding box coordinates"),
 ) -> OCRResult:
     r"""Get OCR text extraction and bounding box data for a photo (v2.2.0+ with v2.3.0+ enhancements).
 
@@ -1202,9 +1202,7 @@ async def get_ocr_data(
     """
     try:
         client = await get_api_client()
-        ocr_data = await client.get_asset_ocr(
-            asset_id, include_bounding_boxes=include_bounding_boxes
-        )
+        ocr_data = await client.get_asset_ocr(asset_id, include_bounding_boxes=include_bounding_boxes)
 
         return OCRResult(
             asset_id=asset_id,
@@ -1286,7 +1284,7 @@ async def get_asset_ocr(asset_id: str) -> OcrInfo:
         if ocr_info.has_bounding_boxes:
             for box in ocr_info.bounding_boxes:
                 # Each box has: x, y, width, height, text, confidence
-                print(f"Text: {box['text']} at ({box['x']}, {box['y']})")
+                # logger.info(f"Text: {box['text']} at ({box['x']}, {box['y']})")
 
         # Error handling
         ocr_info = await get_asset_ocr(asset_id="invalid_id")
@@ -1346,9 +1344,7 @@ async def get_asset_ocr(asset_id: str) -> OcrInfo:
 @mcp.tool()
 async def organize_photos_by_date(
     asset_ids: list[str],
-    organization_type: str = Field(
-        "year_month", description="Organization: year, year_month, or year_month_day"
-    ),
+    organization_type: str = Field("year_month", description="Organization: year, year_month, or year_month_day"),
 ) -> OrganizeResult:
     r"""Automatically organize photos into date-based albums.
 
@@ -1381,9 +1377,7 @@ async def organize_photos_by_date(
         client = await get_api_client()
 
         # Perform organization
-        result = await client.organize_photos_by_date(
-            asset_ids=asset_ids, organization_type=organization_type
-        )
+        result = await client.organize_photos_by_date(asset_ids=asset_ids, organization_type=organization_type)
 
         return OrganizeResult(
             albums_created=result.get("albums_created", 0),
@@ -1408,9 +1402,7 @@ async def organize_photos_by_date(
 async def delete_photos(
     asset_ids: list[str],
     *,
-    move_to_trash: bool = Field(
-        default=True, description="Move to trash (true) or permanently delete (false)"
-    ),
+    move_to_trash: bool = Field(default=True, description="Move to trash (true) or permanently delete (false)"),
 ) -> DeletionResult:
     r"""Delete photos with trash/permanent options.
 
@@ -1466,9 +1458,7 @@ async def delete_photos(
 
 
 @mcp.tool()
-async def create_album(
-    name: str, description: str | None = None, asset_ids: list[str] | None = None
-) -> AlbumResult:
+async def create_album(name: str, description: str | None = None, asset_ids: list[str] | None = None) -> AlbumResult:
     r"""Create a new album with optional assets and description.
 
     Creates a new album in Immich with the specified name, optionally adding assets
@@ -1569,9 +1559,7 @@ async def create_album(
     try:
         client = await get_api_client()
 
-        result = await client.create_album(
-            name=name, description=description, asset_ids=asset_ids or []
-        )
+        result = await client.create_album(name=name, description=description, asset_ids=asset_ids or [])
 
         return AlbumResult(
             id=result["id"],
@@ -1850,9 +1838,7 @@ async def share_album(
 
 
 @mcp.tool()
-async def detect_people(
-    asset_ids: list[str] | None = None, *, force_reprocess: bool = False
-) -> PeopleDetectionResult:
+async def detect_people(asset_ids: list[str] | None = None, *, force_reprocess: bool = False) -> PeopleDetectionResult:
     r"""Run face detection on photos and return clustering results.
 
     Parameters:
@@ -1880,9 +1866,7 @@ async def detect_people(
         start_time = asyncio.get_event_loop().time()
         client = await get_api_client()
 
-        result = await client.run_face_detection(
-            asset_ids=asset_ids, force_reprocess=force_reprocess
-        )
+        result = await client.run_face_detection(asset_ids=asset_ids, force_reprocess=force_reprocess)
 
         end_time = asyncio.get_event_loop().time()
         processing_time = end_time - start_time
@@ -1907,9 +1891,7 @@ async def detect_people(
 
 
 @mcp.tool()
-async def tag_person(
-    person_id: str, name: str, face_asset_ids: list[str] | None = None
-) -> PersonTagResult:
+async def tag_person(person_id: str, name: str, face_asset_ids: list[str] | None = None) -> PersonTagResult:
     r"""Assign name to detected person/face cluster.
 
     Parameters:
@@ -1937,9 +1919,7 @@ async def tag_person(
     try:
         client = await get_api_client()
 
-        result = await client.update_person(
-            person_id=person_id, name=name, face_asset_ids=face_asset_ids or []
-        )
+        result = await client.update_person(person_id=person_id, name=name, face_asset_ids=face_asset_ids or [])
 
         return PersonTagResult(
             person_id=person_id,
@@ -2373,9 +2353,7 @@ async def create_library(
 
 
 @mcp.tool()
-async def scan_library(
-    library_id: str, refresh_modified_files: bool = False, refresh_all_files: bool = False
-) -> dict:
+async def scan_library(library_id: str, refresh_modified_files: bool = False, refresh_all_files: bool = False) -> dict:
     """Scan a library for new or changed photos from external folders.
 
     This is the key solution to 'unwieldy external folder management' - instead
@@ -2736,13 +2714,13 @@ async def get_current_user() -> dict:
         # Get user-specific capabilities if API client is available
         capabilities = {}
         if api_client:
-            try:
+            from contextlib import suppress
+
+            with suppress(Exception):
                 # Try to get user capabilities (this might vary by Immich version)
                 capabilities["can_create_libraries"] = current_user.role in ["admin", "owner"]
                 capabilities["can_manage_users"] = current_user.role == "admin"
                 capabilities["can_delete_content"] = current_user.role in ["admin", "user"]
-            except Exception:
-                pass
 
         return {
             "success": True,
@@ -2809,7 +2787,7 @@ def main():
     """Main entry point with unified transport handling (FastMCP 3.1)."""
     from .transport import run_server
 
-    logger.info("Starting ImmichMCP - FastMCP 3.1 Server")
+    logger.info("Starting ImmichMCP - Industrialized FastMCP 3.2.0 Server")
     run_server(mcp, server_name="immich-mcp")
 
 

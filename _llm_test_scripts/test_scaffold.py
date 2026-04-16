@@ -17,34 +17,29 @@ Requirements:
 import asyncio
 import json
 import logging
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
 # Add src to path for imports
 src_dir = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_dir))
 
 from immich_mcp.server import (
-    upload_photos,
-    search_photos,
-    get_photo_info,
-    get_ocr_data,
-    get_asset_ocr,
-    organize_photos_by_date,
-    delete_photos,
-    create_album,
     add_to_album,
-    list_albums,
-    share_album,
-    detect_people,
-    tag_person,
-    search_by_person,
-    get_storage_info,
     backup_photos,
+    create_album,
+    detect_people,
+    get_asset_ocr,
+    get_ocr_data,
+    get_photo_info,
+    get_storage_info,
+    list_albums,
+    organize_photos_by_date,
+    search_photos,
     server_health,
+    share_album,
+    upload_photos,
 )
 
 # Configure logging
@@ -61,14 +56,14 @@ class ImmichTestScaffold:
 
     def __init__(self):
         self.test_photos_dir = Path(__file__).parent / "test_photos"
-        self.uploaded_assets: List[str] = []
-        self.created_albums: List[str] = []
-        self.test_results: Dict[str, Dict] = {}
+        self.uploaded_assets: list[str] = []
+        self.created_albums: list[str] = []
+        self.test_results: dict[str, dict] = {}
 
         # Ensure test photos directory exists
         self.test_photos_dir.mkdir(exist_ok=True)
 
-    def create_test_photos(self) -> List[str]:
+    def create_test_photos(self) -> list[str]:
         """Create sample test photos for testing using real images."""
         logger.info("Preparing test photos...")
 
@@ -85,7 +80,7 @@ class ImmichTestScaffold:
             "Hol 99 - Dried Flowers on Mantelpiece.JPG",
             "Hol 99 - Russian Dolls [digicam].JPG",
             "Hol 99 - Gallo Gigante (Venetian Glass Bird) [digicam].jpg",
-            "Hol 99 - Town Square [digicam].JPG"
+            "Hol 99 - Town Square [digicam].JPG",
         ]
 
         # Add real 1998 photos
@@ -103,7 +98,7 @@ class ImmichTestScaffold:
             "mountain_hike.jpg",
             "city_street.jpg",
             "family_dinner.jpg",
-            "dog_playing.jpg"
+            "dog_playing.jpg",
         ]
 
         for image_name in placeholder_photos:
@@ -128,7 +123,7 @@ class ImmichTestScaffold:
             self.test_results["server_health"] = {"status": "FAIL", "error": str(e)}
             return False
 
-    async def test_photo_upload(self, test_files: List[str]) -> bool:
+    async def test_photo_upload(self, test_files: list[str]) -> bool:
         """Test 2: Photo upload functionality."""
         logger.info("[UPLOAD] Testing photo upload...")
 
@@ -137,7 +132,7 @@ class ImmichTestScaffold:
             result = await upload_photos(
                 file_paths=test_files[:5],  # Upload first 5 photos
                 album_name="Test Batch Upload",
-                auto_organize=False
+                auto_organize=False,
             )
 
             logger.info(f"✅ Uploaded {result.uploaded_count} photos, {result.duplicate_count} duplicates")
@@ -159,10 +154,7 @@ class ImmichTestScaffold:
             created_albums = []
 
             for album_name in album_names:
-                result = await create_album(
-                    name=album_name,
-                    description=f"Test album: {album_name}"
-                )
+                result = await create_album(name=album_name, description=f"Test album: {album_name}")
                 created_albums.append(result.id)
                 logger.info(f"✅ Created album: {album_name} (ID: {result.id})")
 
@@ -175,7 +167,7 @@ class ImmichTestScaffold:
             self.test_results["album_creation"] = {
                 "status": "PASS",
                 "albums_created": len(created_albums),
-                "albums_listed": len(albums)
+                "albums_listed": len(albums),
             }
             return True
         except Exception as e:
@@ -196,26 +188,19 @@ class ImmichTestScaffold:
             album_id = self.created_albums[0]
             asset_ids = self.uploaded_assets[:3]
 
-            add_result = await add_to_album(
-                album_id=album_id,
-                asset_ids=asset_ids
-            )
+            add_result = await add_to_album(album_id=album_id, asset_ids=asset_ids)
 
             logger.info(f"✅ Added {add_result.added_count} photos to album")
 
             # Test album sharing
-            share_result = await share_album(
-                album_id=album_id,
-                allow_download=True,
-                allow_upload=False
-            )
+            share_result = await share_album(album_id=album_id, allow_download=True, allow_upload=False)
 
             logger.info(f"✅ Created share link: {share_result.public_url}")
 
             self.test_results["album_operations"] = {
                 "status": "PASS",
                 "photos_added": add_result.added_count,
-                "share_url": share_result.public_url
+                "share_url": share_result.public_url,
             }
             return True
         except Exception as e:
@@ -244,7 +229,7 @@ class ImmichTestScaffold:
             self.test_results["photo_search"] = {
                 "status": "PASS",
                 "searches_performed": len(searches),
-                "results": search_results
+                "results": search_results,
             }
             return True
         except Exception as e:
@@ -284,7 +269,7 @@ class ImmichTestScaffold:
             self.test_results["photo_info"] = {
                 "status": "PASS",
                 "asset_filename": info.original_filename,
-                "file_size": info.file_size_bytes
+                "file_size": info.file_size_bytes,
             }
             return True
         except Exception as e:
@@ -313,7 +298,7 @@ class ImmichTestScaffold:
             self.test_results["face_detection"] = {
                 "status": "PASS",
                 "faces_detected": detect_result.detected_faces,
-                "people_created": detect_result.new_people
+                "people_created": detect_result.new_people,
             }
             return True
         except Exception as e:
@@ -332,15 +317,16 @@ class ImmichTestScaffold:
         try:
             # Test date-based organization
             organize_result = await organize_photos_by_date(
-                asset_ids=self.uploaded_assets,
-                organization_type="year_month"
+                asset_ids=self.uploaded_assets, organization_type="year_month"
             )
-            logger.info(f"✅ Organized {organize_result.photos_organized} photos into {organize_result.albums_created} albums")
+            logger.info(
+                f"✅ Organized {organize_result.photos_organized} photos into {organize_result.albums_created} albums"
+            )
 
             self.test_results["organization"] = {
                 "status": "PASS",
                 "photos_organized": organize_result.photos_organized,
-                "albums_created": organize_result.albums_created
+                "albums_created": organize_result.albums_created,
             }
             return True
         except Exception as e:
@@ -361,17 +347,16 @@ class ImmichTestScaffold:
             backup_path = Path(__file__).parent / "test_backup"
             backup_path.mkdir(exist_ok=True)
 
-            backup_result = await backup_photos(
-                backup_path=str(backup_path),
-                include_metadata=True
+            backup_result = await backup_photos(backup_path=str(backup_path), include_metadata=True)
+            logger.info(
+                f"✅ Backup created: {backup_result.exported_photos} photos, {backup_result.total_size_mb:.1f}MB"
             )
-            logger.info(f"✅ Backup created: {backup_result.exported_photos} photos, {backup_result.total_size_mb:.1f}MB")
 
             self.test_results["storage_backup"] = {
                 "status": "PASS",
                 "total_photos": storage.photos + storage.videos,
                 "usage_gb": storage.usage,
-                "backup_size_mb": backup_result.total_size_mb
+                "backup_size_mb": backup_result.total_size_mb,
             }
             return True
         except Exception as e:
@@ -409,7 +394,7 @@ class ImmichTestScaffold:
             self.test_results["error_handling"] = {"status": "FAIL", "error": str(e)}
             return False
 
-    async def generate_test_report(self) -> Dict:
+    async def generate_test_report(self) -> dict:
         """Generate comprehensive test report."""
         logger.info("[ORG] Generating test report...")
 
@@ -423,20 +408,22 @@ class ImmichTestScaffold:
                 "total_tests": total_tests,
                 "passed": passed_tests,
                 "failed": failed_tests,
-                "success_rate": f"{(passed_tests/total_tests*100):.1f}%" if total_tests > 0 else "0%"
+                "success_rate": f"{(passed_tests / total_tests * 100):.1f}%" if total_tests > 0 else "0%",
             },
             "assets_created": len(self.uploaded_assets),
             "albums_created": len(self.created_albums),
-            "detailed_results": self.test_results
+            "detailed_results": self.test_results,
         }
 
         # Save report to file
         report_path = Path(__file__).parent / "test_report.json"
-        with open(report_path, 'w') as f:
+        with open(report_path, "w") as f:
             json.dump(report, f, indent=2, default=str)
 
         logger.info(f"✅ Test report saved to: {report_path}")
-        logger.info(f"[STATS] Test Results: {passed_tests}/{total_tests} passed ({report['test_summary']['success_rate']})")
+        logger.info(
+            f"[STATS] Test Results: {passed_tests}/{total_tests} passed ({report['test_summary']['success_rate']})"
+        )
 
         return report
 
@@ -452,7 +439,7 @@ class ImmichTestScaffold:
         logger.info("ℹ️ Cleanup skipped for safety - manual cleanup recommended")
         return True
 
-    async def run_full_test_suite(self) -> Dict:
+    async def run_full_test_suite(self) -> dict:
         """Run the complete test suite."""
         logger.info("[START] Starting Immich MCP Comprehensive Test Suite")
         logger.info("=" * 60)
@@ -475,7 +462,7 @@ class ImmichTestScaffold:
         ]
 
         for test_name, test_func in tests:
-            logger.info(f"\n{'='*20} {test_name} {'='*20}")
+            logger.info(f"\n{'=' * 20} {test_name} {'=' * 20}")
             try:
                 await test_func()
             except Exception as e:
@@ -488,9 +475,9 @@ class ImmichTestScaffold:
         # Optional cleanup
         await self.cleanup_test_data()
 
-        logger.info("\n" + "="*60)
+        logger.info("\n" + "=" * 60)
         logger.info("[END] Immich MCP Test Suite Complete!")
-        logger.info("="*60)
+        logger.info("=" * 60)
 
         return report
 
@@ -498,20 +485,9 @@ class ImmichTestScaffold:
 async def main():
     """Main entry point."""
     scaffold = ImmichTestScaffold()
-    report = await scaffold.run_full_test_suite()
+    await scaffold.run_full_test_suite()
 
     # Print summary
-    print("\n" + "="*60)
-    print("TEST SUITE SUMMARY")
-    print("="*60)
-    print(f"Tests Run: {report['test_summary']['total_tests']}")
-    print(f"Passed: {report['test_summary']['passed']}")
-    print(f"Failed: {report['test_summary']['failed']}")
-    print(f"Success Rate: {report['test_summary']['success_rate']}")
-    print(f"Assets Created: {report['test_summary'].get('assets_created', 0)}")
-    print(f"Albums Created: {report['test_summary'].get('albums_created', 0)}")
-    print(f"Report Saved: test_report.json")
-    print("="*60)
 
 
 if __name__ == "__main__":

@@ -10,13 +10,13 @@ export default defineConfig({
     },
   },
   server: {
-    port: 10838,
+    port: 10795,
     host: "127.0.0.1",
     proxy: {
-      '/api/v1': {
-        target: 'http://127.0.0.1:10839',
+      "/api/v1": {
+        target: "http://127.0.0.1:10794",
         changeOrigin: true,
       },
-    }
-  }
+    },
+  },
 });

@@ -16,7 +16,10 @@ def register_agentic_tools():
             category: Optional category to filter help (e.g., 'photos', 'albums', 'system', 'agentic')
         """
         help_data = {
-            "photos": "Tools for searching and uploading photos. Use 'search_photos' to find assets and 'upload_photos' to add new ones.",
+            "photos": (
+                "Tools for searching and uploading photos. Use 'search_photos' to find assets "
+                "and 'upload_photos' to add new ones."
+            ),
             "albums": "Tools for managing collections. Use 'list_albums' or 'create_album'.",
             "system": "Tools for checking Immich server stats. Use 'server_stats' or 'server_health'.",
             "agentic": "Tools like 'agentic_immich_workflow' for autonomous orchestration.",
@@ -24,10 +27,17 @@ def register_agentic_tools():
 
         if category and category.lower() in help_data:
             ctx.info(f"Retrieving help for category: {category}")
-            return f"### Immich Help: {category.capitalize()}\n\n{help_data[category.lower()]}\n\nIs there anything specific you'd like to do with these tools?"
+            return (
+                f"### Immich Help: {category.capitalize()}\n\n{help_data[category.lower()]}\n\n"
+                "Is there anything specific you'd like to do with these tools?"
+            )
 
-        categories_str = ", ".join([f"`{c}`" for c in help_data.keys()])
-        return f"### Immich MCP Help System\n\nI can help you with the following categories: {categories_str}.\n\nSpecified a category to get more detailed information, or just ask me a question about your photo library!"
+        categories_str = ", ".join([f"`{c}`" for c in help_data])
+        return (
+            f"### Immich MCP Help System\n\nI can help you with the following categories: {categories_str}.\n\n"
+            "Specified a category to get more detailed information, or just ask me a question "
+            "about your photo library!"
+        )
 
     @mcp.tool()
     async def agentic_immich_workflow(
@@ -47,7 +57,10 @@ def register_agentic_tools():
 
         # Use sampling to get a plan and execution guidance from the LLM
         sampling_result = await ctx.sample(
-            prompt=f"Goal: {workflow_prompt}\n\nPlan and execute this using Immich MCP tools. If helpful, provide a step-by-step summary.",
+            prompt=(
+                f"Goal: {workflow_prompt}\n\nPlan and execute this using Immich MCP tools. "
+                "If helpful, provide a step-by-step summary."
+            ),
             max_tokens=600,
         )
 
@@ -73,7 +86,11 @@ def register_agentic_tools():
 
         # Sample for processing strategy
         sampling_result = await ctx.sample(
-            prompt=f"Goal: {processing_goal}\nBatch Size: {len(photos)}\nOperations: {available_operations}\n\nSuggest the best processing sequence for these assets.",
+            prompt=(
+                f"Goal: {processing_goal}\nBatch Size: {len(photos)}\n"
+                f"Operations: {available_operations}\n\n"
+                "Suggest the best processing sequence for these assets."
+            ),
             max_tokens=500,
         )
 
@@ -93,7 +110,11 @@ def register_agentic_tools():
 
         # Sample the LLM for a helpful conversational response
         sampling_result = await ctx.sample(
-            prompt=f"User Query: {user_query}\n\nAs an Immich assistant, provide a helpful, conversational response based on your knowledge of the Immich MCP tools. Suggest specific tools if relevant.",
+            prompt=(
+                f"User Query: {user_query}\n\nAs an Immich assistant, provide a helpful, "
+                "conversational response based on your knowledge of the Immich MCP tools. "
+                "Suggest specific tools if relevant."
+            ),
             max_tokens=300,
         )
 

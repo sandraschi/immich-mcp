@@ -16,11 +16,11 @@ class Settings(BaseSettings):
 
     # Application settings
     app_name: str = "ImmichMCP"
-    app_version: str = "1.0.0"
-    app_description: str = "FastMCP 2.10 server for Immich photo management"
+    app_version: str = "1.5.0"
+    app_description: str = "FastMCP 3.2.0 server for Immich photo management"
 
     # Server settings
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # noqa: S104
     port: int = 8000
     reload: bool = False
     log_level: str = "info"

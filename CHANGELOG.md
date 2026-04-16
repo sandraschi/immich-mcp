@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-04-14
+
+### Added
+- **Industrialization (SOTA 2026)**: Full fleet parity with FastMCP 3.2.0 standards.
+- **Frontend Evolution**: Migrated web dashboard to **Biome (v1.9.4)** for stabilized linting and formatting.
+- **Port Synchronization**: Locked dashboard to port **10795** and API to **10794** for fleet-wide registry compliance.
+- **Protocol Hardening**: Unified JSON-RPC stream preservation with absolute `print()` purging in sources.
+- **Registry Integration**: Updated fleet manifest for high-fidelity discovery.
+
+### Changed
+- Modernized `pyproject.toml` with expanded Ruff rules (`T20`, `C4`, `SIM`, `I`).
+- Updated README with SOTA v13.1 registry badges and industrialized versioning.
+- Synchronized all internal metadata to April 2026 release standards.
+
+### Fixed
+- Fixed documentation/source version inconsistencies between `__init__.py` and `pyproject.toml`.
+- Resolved potential JSON-RPC corruption by converting docstring `print` examples to inactive comments.
+
 ## [1.1.0] - 2025-01-27
 
 ### Added

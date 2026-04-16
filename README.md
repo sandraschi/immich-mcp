@@ -1,10 +1,14 @@
 # Immich MCP Server
 
-**FastMCP 3.1** | **Austrian Efficiency** | **Conversational AI & Sampling**
+[![Industrial SOTA v13.1](https://img.shields.io/badge/SOTA-v13.1-blueviolet.svg?style=for-the-badge&logo=arm&logoColor=white)](https://github.com/sandraschi/mcp-central-docs)
+[![FastMCP 3.2.0](https://img.shields.io/badge/FastMCP-3.2.0-blue.svg?style=for-the-badge)](https://jlowin.github.io/fastmcp/)
+[![Industrialized v1.5.0](https://img.shields.io/badge/Version-v1.5.0-green.svg?style=for-the-badge)](https://github.com/sandraschi/immich-mcp/blob/main/CHANGELOG.md)
+
+**Industrialized FastMCP 3.2.0** | **Austrian Efficiency** | **Conversational AI & Sampling**
 
 Efficient Immich photo library management through the MCP (Model Context Protocol). Simple, reliable, effective.
 
-> **Status**: Operational with Immich v2.4.0+, FastMCP 3.1, Cursor MCP integration, conversational AI and sampling
+> **Status**: [SOTA v13.1] Operational with Immich v2.4.0+, FastMCP 3.2.0 parity, Biome-stabilized, conversational AI and sampling.
 
 ## Quick Start
 
@@ -692,10 +696,10 @@ For Immich v2.4.0, use [Immich++](https://github.com/sandraschi/immich-plus) whi
 ##  Webapp Dashboard
 
 This MCP server includes a free, premium web interface for monitoring and control.
-By default, the web dashboard runs on port **10838**.
-*(Assigned ports: **10838** (Web dashboard frontend), **10839** (Web dashboard backend (API)))*
+By default, the web dashboard runs on port **10795**.
+*(Assigned ports: **10795** (Web dashboard frontend), **10794** (Web dashboard backend (API)))*
 
 To start the webapp:
-1. Navigate to the `webapp` (or `web`, `frontend`) directory.
+1. Navigate to the `web_sota` directory.
 2. Run `start.bat` (Windows) or `./start.ps1` (PowerShell).
-3. Open `http://localhost:10838` in your browser.
+3. Open `http://localhost:10795` in your browser.
