@@ -1,14 +1,16 @@
 # Immich MCP Server
 
+[![FastMCP Version](https://img.shields.io/badge/FastMCP-3.1-blue?style=flat-square&logo=python&logoColor=white)](https://github.com/sandraschi/fastmcp) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![Linted with Biome](https://img.shields.io/badge/Linted_with-Biome-60a5fa?style=flat-square&logo=biome&logoColor=white)](https://biomejs.dev/) [![Built with Just](https://img.shields.io/badge/Built_with-Just-000000?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/casey/just)
+
 [![Industrial SOTA v13.1](https://img.shields.io/badge/SOTA-v13.1-blueviolet.svg?style=for-the-badge&logo=arm&logoColor=white)](https://github.com/sandraschi/mcp-central-docs)
-[![FastMCP 3.2.0](https://img.shields.io/badge/FastMCP-3.2.0-blue.svg?style=for-the-badge)](https://jlowin.github.io/fastmcp/)
+[![FastMCP 3.1](https://img.shields.io/badge/FastMCP-3.2.0-blue.svg?style=for-the-badge)](https://jlowin.github.io/fastmcp/)
 [![Industrialized v1.5.0](https://img.shields.io/badge/Version-v1.5.0-green.svg?style=for-the-badge)](https://github.com/sandraschi/immich-mcp/blob/main/CHANGELOG.md)
 
-**Industrialized FastMCP 3.2.0** | **Austrian Efficiency** | **Conversational AI & Sampling**
+**Industrialized FastMCP 3.1** | **Austrian Efficiency** | **Conversational AI & Sampling**
 
 Efficient Immich photo library management through the MCP (Model Context Protocol). Simple, reliable, effective.
 
-> **Status**: [SOTA v13.1] Operational with Immich v2.4.0+, FastMCP 3.2.0 parity, Biome-stabilized, conversational AI and sampling.
+> **Status**: [SOTA v13.1] Operational with Immich v2.4.0+, FastMCP 3.1 parity, Biome-stabilized, conversational AI and sampling.
 
 ## Quick Start
 
@@ -588,6 +590,17 @@ python -m black immich/ tests/
 python -m isort immich/ tests/
 ```
 
+
+## 🛡️ Industrial Quality Stack
+
+This project adheres to **SOTA 14.1** industrial standards for high-fidelity agentic orchestration:
+
+- **Python (Core)**: [Ruff](https://astral.sh/ruff) for linting and formatting. Zero-tolerance for `print` statements in core handlers (`T201`).
+- **Webapp (UI)**: [Biome](https://biomejs.dev/) for sub-millisecond linting. Strict `noConsoleLog` enforcement.
+- **Protocol Compliance**: Hardened `stdout/stderr` isolation to ensure crash-resistant JSON-RPC communication.
+- **Automation**: [Justfile](./justfile) recipes for all fleet operations (`just lint`, `just fix`, `just dev`).
+- **Security**: Automated audits via `bandit` and `safety`.
+
 ##  License
 
 [Your chosen license - typically MIT for MCP servers]
@@ -682,7 +695,7 @@ For Immich v2.4.0, use [Immich++](https://github.com/sandraschi/immich-plus) whi
 
 ### v1.0.0 (2025-07-22)
 
--  **Initial FastMCP 2.0 implementation**
+-  **Initial FastMCP 3.1 implementation**
 -  **15 comprehensive photo management tools**
 -  **Austrian efficiency optimization**
 -  **Complete documentation and testing**

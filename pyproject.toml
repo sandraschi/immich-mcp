@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "immich-mcp"
 version = "1.5.0"
-description = "Industrialized FastMCP 3.2.0 server for Immich photo management with conversational AI, sampling, and SOTA 2026 fleet standards."
+description = "Industrialized FastMCP 3.1 server for Immich photo management with conversational AI, sampling, and SOTA 2026 fleet standards."
 authors = [
     {name = "Sandra", email = "sandra@example.com"}
 ]
