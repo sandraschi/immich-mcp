@@ -101,7 +101,7 @@ class ImmichConfig:
     @classmethod
     def from_env(cls) -> "ImmichConfig":
         """Create configuration from environment variables"""
-        server_url = os.getenv("IMMICH_SERVER_URL", "http://localhost:2283")
+        server_url = os.getenv("IMMICH_SERVER_URL", "")
         active_user = os.getenv("IMMICH_ACTIVE_USER", "")
 
         # Parse users configuration

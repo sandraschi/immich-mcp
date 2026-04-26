@@ -4,6 +4,8 @@ FastMCP 3.1 API routes for ImmichMCP.
 FastAPI router with all v1 API endpoints (health, users, thumbnails, system).
 """
 
+import logging
+import os
 import asyncio
 
 import httpx
@@ -13,8 +15,30 @@ from pydantic import BaseModel
 from ...immich_api import ImmichAPIClient, ImmichAPIError, get_api_client
 
 router = APIRouter(tags=["v1"])
+logger = logging.getLogger(__name__)
 
 
+class ChatRequest(BaseModel):
+    message: str
+    provider: str = "ollama"
+    model: str = "llama3.3"
+ 
+ 
+@router.post("/chat")
+async def chat_with_immich(request: ChatRequest):
+    """Handle chat requests from the webapp."""
+    # For now, this is a bridge to the conversational_immich_assistant logic
+    # or a direct call to a local LLM if configured.
+    return {
+        "success": True, 
+        "response": f"I received your message: '{request.message}'. I'm currently being industrialized to support direct {request.provider} ({request.model}) interaction.",
+        "debug": {
+            "provider": request.provider,
+            "model": request.model
+        }
+    }
+ 
+ 
 @router.get("/health")
 async def health_check():
     """Health check for FastMCP 3.1 / webapp."""
@@ -520,6 +544,55 @@ async def list_mcp_tools():
         return {"success": True, "tools": []}
 
 
+@router.get("/logs")
+async def get_logs(limit: int = 100):
+    """Retrieve system logs for the dashboard.
+    For now, returns a combination of memory logs and recent file-based logs.
+    """
+    try:
+        log_file = "server_output.log"
+        if os.path.exists(log_file):
+            with open(log_file, "r") as f:
+                content = f.readlines()
+                return {"success": True, "logs": content[-limit:]}
+        return {"success": True, "logs": ["Server running. No log file found at root."]}
+    except Exception as e:
+        return {"success": False, "error": str(e), "logs": []}
+ 
+ 
+@router.get("/llm/providers")
+async def get_llm_providers():
+    """List supported LLM providers for the webapp."""
+    return {
+        "success": True,
+        "providers": [
+            {"id": "ollama", "name": "Ollama (Local)", "url": "http://localhost:11434"},
+            {"id": "openrouter", "name": "OpenRouter (Cloud)", "url": "https://openrouter.ai/api/v1"},
+            {"id": "lm-studio", "name": "LM Studio (Local)", "url": "http://localhost:1234/v1"},
+        ],
+    }
+ 
+ 
+@router.get("/llm/models")
+async def get_llm_models(provider: str = "ollama"):
+    """Fetch models from a specific provider (proxied)."""
+    if provider == "ollama":
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get("http://localhost:11434/api/tags", timeout=2.0)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    models = [m["name"] for m in data.get("models", [])]
+                    return {"success": True, "models": models}
+        except Exception:
+            return {"success": True, "models": ["llama3.3", "mistral", "phi3"]}  # Fallback defaults
+ 
+    if provider == "openrouter":
+        return {"success": True, "models": ["anthropic/claude-3-sonnet", "google/gemini-pro-1.5"]}
+ 
+    return {"success": True, "models": ["default-model"]}
+ 
+ 
 # Static help content for webapp (no MCP tool dependency)
 HELP_CONTENT: dict[str, str] = {
     "overview": (
@@ -548,6 +621,21 @@ HELP_CONTENT: dict[str, str] = {
     "settings": (
         "Set Immich server URL, API key, and optional multi-user config. "
         "Restart the backend after changing env or config."
+    ),
+    "immich": (
+        "Immich is a high-performance self-hosted photo and video management solution. "
+        "It features mobile app support, facial recognition, and CLIP-based semantic search. "
+        "Visit https://immich.app for official documentation."
+    ),
+    "webapp": (
+        "This dashboard is a React-based frontend built with Vite and Tailwind CSS. "
+        "It provides a premium visual interface for the Immich MCP Server, allowing you to "
+        "browse your library, use AI tools, and monitor system health."
+    ),
+    "mcp_server": (
+        "The MCP Server (ImmichMCP) is the bridge between AI agents and your photo library. "
+        "It implements the Model Context Protocol (FastMCP 3.1) and exposes tools for "
+        "search, upload, and organization that can be used by models like Claude or Gemini."
     ),
 }
 

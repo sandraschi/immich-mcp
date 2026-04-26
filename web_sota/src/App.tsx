@@ -9,6 +9,7 @@ import { People } from '@/pages/people';
 import { Map } from '@/pages/map';
 import { Tools } from '@/pages/tools';
 import { Help } from '@/pages/help';
+import { Logger } from '@/pages/logger';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/map" element={<Map />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/tools" element={<Tools />} />
+          <Route path="/logger" element={<Logger />} />
           <Route path="/help" element={<Help />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -10,7 +10,8 @@ import {
     Wrench,
     HelpCircle,
     Users,
-    Map
+    Map,
+    Terminal
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         { href: '/map', label: 'Map View', icon: Map },
         { href: '/chat', label: 'AI Command', icon: Bot },
         { href: '/tools', label: 'Tools', icon: Wrench },
+        { href: '/logger', label: 'System Logs', icon: Terminal },
         { href: '/help', label: 'Help', icon: HelpCircle },
         { href: '/settings', label: 'Settings', icon: Settings },
     ];
