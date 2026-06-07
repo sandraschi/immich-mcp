@@ -1,3 +1,6 @@
+﻿Param([switch]$Headless)
+
+# Fast port helpers (scripts/PortHelpers.ps1)
 Param([switch]$Headless)
 $SkipFrontend = $Headless
 
@@ -63,6 +66,354 @@ Start-Process powershell -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "
 Write-Host "Browser will open automatically when Vite is ready." -ForegroundColor Gray
 if ($SkipFrontend) { return }
 npm run dev -- --port $WebPort --host
+
+
+
+
+_RepoRootForPorts = Split-Path -Parent $PSScriptRoot
+Param([switch]$Headless)
+$SkipFrontend = $Headless
+
+# --- SOTA Headless Standard ---
+if ($Headless -and ($Host.UI.RawUI.WindowTitle -notmatch 'Hidden')) {
+    Start-Process pwsh -ArgumentList '-NoProfile', '-File', $PSCommandPath, '-Headless' -WindowStyle Hidden
+    exit
+}
+$WindowStyle = if ($Headless) { 'Hidden' } else { 'Normal' }
+# ------------------------------
+
+# Webapp Start - Standardized SOTA (Auto-Repaired V2.5)
+$WebPort = 10838
+$BackendPort = 10839
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+
+# 1. Kill any process squatting on the ports
+Write-Host "Checking for port squatters on $WebPort and $BackendPort..." -ForegroundColor Yellow
+$pids = Get-NetTCPConnection -LocalPort $WebPort, $BackendPort -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 4 } | Select-Object -ExpandProperty OwningProcess -Unique
+foreach ($p in $pids) {
+    Write-Host "Found squatter (PID: $p). Terminating..." -ForegroundColor Red
+    try { Stop-Process -Id $p -Force -ErrorAction Stop } catch { Write-Host "Warning: Could not terminate PID $p." -ForegroundColor Gray }
+}
+
+# 2. Setup
+Set-Location $PSScriptRoot
+if (-not (Test-Path "node_modules")) { npm install }
+
+# 3. Start the Python backend (Background) from project root so immich_mcp package resolves
+Write-Host "Starting Python backend on port $BackendPort ..." -ForegroundColor Cyan
+$backendCmd = "Set-Location '$ProjectRoot'; uv run --project '$ProjectRoot' uvicorn immich_mcp.server:app --host 127.0.0.1 --port $BackendPort --log-level info"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -WindowStyle Normal
+
+# 3b. Wait for HTTP health (fleet probe uses GET /api/v1/health, not TCP-only)
+$healthUrl = "http://127.0.0.1:$BackendPort/api/v1/health"
+$maxAttempts = 30
+$attempt = 0
+$backendUp = $false
+while ($attempt -lt $maxAttempts) {
+    try {
+        $null = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+        $backendUp = $true
+        break
+    } catch {
+        Start-Sleep -Seconds 2
+        $attempt++
+    }
+}
+if ($backendUp) {
+    Write-Host "Backend (port $BackendPort) answered GET /api/v1/health." -ForegroundColor Green
+} else {
+    Write-Host "Backend (port $BackendPort) did not return HTTP 200 from /api/v1/health; check the backend window." -ForegroundColor Yellow
+}
+
+# 4. Run server (Vite dev)
+Write-Host "Starting Vite frontend on port $WebPort ..." -ForegroundColor Green
+
+# 4b. Launch background task to open browser once frontend is ready (Auto-opened by Antigravity)
+$frontendUrl = "http://127.0.0.1:$WebPort/"
+$pollAndOpen = "for (`$i = 0; `$i -lt 60; `$i++) { try { `$null = Invoke-WebRequest -Uri '$frontendUrl' -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop; Start-Process '$frontendUrl'; exit } catch { Start-Sleep -Seconds 1 } }"
+Start-Process powershell -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-Command", $pollAndOpen
+
+Write-Host "Browser will open automatically when Vite is ready." -ForegroundColor Gray
+if ($SkipFrontend) { return }
+npm run dev -- --port $WebPort --host
+
+
+
+
+_PortHelpers = Join-Path Param([switch]$Headless)
+$SkipFrontend = $Headless
+
+# --- SOTA Headless Standard ---
+if ($Headless -and ($Host.UI.RawUI.WindowTitle -notmatch 'Hidden')) {
+    Start-Process pwsh -ArgumentList '-NoProfile', '-File', $PSCommandPath, '-Headless' -WindowStyle Hidden
+    exit
+}
+$WindowStyle = if ($Headless) { 'Hidden' } else { 'Normal' }
+# ------------------------------
+
+# Webapp Start - Standardized SOTA (Auto-Repaired V2.5)
+$WebPort = 10838
+$BackendPort = 10839
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+
+# 1. Kill any process squatting on the ports
+Write-Host "Checking for port squatters on $WebPort and $BackendPort..." -ForegroundColor Yellow
+$pids = Get-NetTCPConnection -LocalPort $WebPort, $BackendPort -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 4 } | Select-Object -ExpandProperty OwningProcess -Unique
+foreach ($p in $pids) {
+    Write-Host "Found squatter (PID: $p). Terminating..." -ForegroundColor Red
+    try { Stop-Process -Id $p -Force -ErrorAction Stop } catch { Write-Host "Warning: Could not terminate PID $p." -ForegroundColor Gray }
+}
+
+# 2. Setup
+Set-Location $PSScriptRoot
+if (-not (Test-Path "node_modules")) { npm install }
+
+# 3. Start the Python backend (Background) from project root so immich_mcp package resolves
+Write-Host "Starting Python backend on port $BackendPort ..." -ForegroundColor Cyan
+$backendCmd = "Set-Location '$ProjectRoot'; uv run --project '$ProjectRoot' uvicorn immich_mcp.server:app --host 127.0.0.1 --port $BackendPort --log-level info"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -WindowStyle Normal
+
+# 3b. Wait for HTTP health (fleet probe uses GET /api/v1/health, not TCP-only)
+$healthUrl = "http://127.0.0.1:$BackendPort/api/v1/health"
+$maxAttempts = 30
+$attempt = 0
+$backendUp = $false
+while ($attempt -lt $maxAttempts) {
+    try {
+        $null = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+        $backendUp = $true
+        break
+    } catch {
+        Start-Sleep -Seconds 2
+        $attempt++
+    }
+}
+if ($backendUp) {
+    Write-Host "Backend (port $BackendPort) answered GET /api/v1/health." -ForegroundColor Green
+} else {
+    Write-Host "Backend (port $BackendPort) did not return HTTP 200 from /api/v1/health; check the backend window." -ForegroundColor Yellow
+}
+
+# 4. Run server (Vite dev)
+Write-Host "Starting Vite frontend on port $WebPort ..." -ForegroundColor Green
+
+# 4b. Launch background task to open browser once frontend is ready (Auto-opened by Antigravity)
+$frontendUrl = "http://127.0.0.1:$WebPort/"
+$pollAndOpen = "for (`$i = 0; `$i -lt 60; `$i++) { try { `$null = Invoke-WebRequest -Uri '$frontendUrl' -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop; Start-Process '$frontendUrl'; exit } catch { Start-Sleep -Seconds 1 } }"
+Start-Process powershell -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-Command", $pollAndOpen
+
+Write-Host "Browser will open automatically when Vite is ready." -ForegroundColor Gray
+if ($SkipFrontend) { return }
+npm run dev -- --port $WebPort --host
+
+
+
+
+_RepoRootForPorts 'scripts\PortHelpers.ps1'
+if (Test-Path -LiteralPath Param([switch]$Headless)
+$SkipFrontend = $Headless
+
+# --- SOTA Headless Standard ---
+if ($Headless -and ($Host.UI.RawUI.WindowTitle -notmatch 'Hidden')) {
+    Start-Process pwsh -ArgumentList '-NoProfile', '-File', $PSCommandPath, '-Headless' -WindowStyle Hidden
+    exit
+}
+$WindowStyle = if ($Headless) { 'Hidden' } else { 'Normal' }
+# ------------------------------
+
+# Webapp Start - Standardized SOTA (Auto-Repaired V2.5)
+$WebPort = 10838
+$BackendPort = 10839
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+
+# 1. Kill any process squatting on the ports
+Write-Host "Checking for port squatters on $WebPort and $BackendPort..." -ForegroundColor Yellow
+$pids = Get-NetTCPConnection -LocalPort $WebPort, $BackendPort -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 4 } | Select-Object -ExpandProperty OwningProcess -Unique
+foreach ($p in $pids) {
+    Write-Host "Found squatter (PID: $p). Terminating..." -ForegroundColor Red
+    try { Stop-Process -Id $p -Force -ErrorAction Stop } catch { Write-Host "Warning: Could not terminate PID $p." -ForegroundColor Gray }
+}
+
+# 2. Setup
+Set-Location $PSScriptRoot
+if (-not (Test-Path "node_modules")) { npm install }
+
+# 3. Start the Python backend (Background) from project root so immich_mcp package resolves
+Write-Host "Starting Python backend on port $BackendPort ..." -ForegroundColor Cyan
+$backendCmd = "Set-Location '$ProjectRoot'; uv run --project '$ProjectRoot' uvicorn immich_mcp.server:app --host 127.0.0.1 --port $BackendPort --log-level info"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -WindowStyle Normal
+
+# 3b. Wait for HTTP health (fleet probe uses GET /api/v1/health, not TCP-only)
+$healthUrl = "http://127.0.0.1:$BackendPort/api/v1/health"
+$maxAttempts = 30
+$attempt = 0
+$backendUp = $false
+while ($attempt -lt $maxAttempts) {
+    try {
+        $null = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+        $backendUp = $true
+        break
+    } catch {
+        Start-Sleep -Seconds 2
+        $attempt++
+    }
+}
+if ($backendUp) {
+    Write-Host "Backend (port $BackendPort) answered GET /api/v1/health." -ForegroundColor Green
+} else {
+    Write-Host "Backend (port $BackendPort) did not return HTTP 200 from /api/v1/health; check the backend window." -ForegroundColor Yellow
+}
+
+# 4. Run server (Vite dev)
+Write-Host "Starting Vite frontend on port $WebPort ..." -ForegroundColor Green
+
+# 4b. Launch background task to open browser once frontend is ready (Auto-opened by Antigravity)
+$frontendUrl = "http://127.0.0.1:$WebPort/"
+$pollAndOpen = "for (`$i = 0; `$i -lt 60; `$i++) { try { `$null = Invoke-WebRequest -Uri '$frontendUrl' -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop; Start-Process '$frontendUrl'; exit } catch { Start-Sleep -Seconds 1 } }"
+Start-Process powershell -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-Command", $pollAndOpen
+
+Write-Host "Browser will open automatically when Vite is ready." -ForegroundColor Gray
+if ($SkipFrontend) { return }
+npm run dev -- --port $WebPort --host
+
+
+
+
+_PortHelpers) { . Param([switch]$Headless)
+$SkipFrontend = $Headless
+
+# --- SOTA Headless Standard ---
+if ($Headless -and ($Host.UI.RawUI.WindowTitle -notmatch 'Hidden')) {
+    Start-Process pwsh -ArgumentList '-NoProfile', '-File', $PSCommandPath, '-Headless' -WindowStyle Hidden
+    exit
+}
+$WindowStyle = if ($Headless) { 'Hidden' } else { 'Normal' }
+# ------------------------------
+
+# Webapp Start - Standardized SOTA (Auto-Repaired V2.5)
+$WebPort = 10838
+$BackendPort = 10839
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+
+# 1. Kill any process squatting on the ports
+Write-Host "Checking for port squatters on $WebPort and $BackendPort..." -ForegroundColor Yellow
+$pids = Get-NetTCPConnection -LocalPort $WebPort, $BackendPort -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 4 } | Select-Object -ExpandProperty OwningProcess -Unique
+foreach ($p in $pids) {
+    Write-Host "Found squatter (PID: $p). Terminating..." -ForegroundColor Red
+    try { Stop-Process -Id $p -Force -ErrorAction Stop } catch { Write-Host "Warning: Could not terminate PID $p." -ForegroundColor Gray }
+}
+
+# 2. Setup
+Set-Location $PSScriptRoot
+if (-not (Test-Path "node_modules")) { npm install }
+
+# 3. Start the Python backend (Background) from project root so immich_mcp package resolves
+Write-Host "Starting Python backend on port $BackendPort ..." -ForegroundColor Cyan
+$backendCmd = "Set-Location '$ProjectRoot'; uv run --project '$ProjectRoot' uvicorn immich_mcp.server:app --host 127.0.0.1 --port $BackendPort --log-level info"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -WindowStyle Normal
+
+# 3b. Wait for HTTP health (fleet probe uses GET /api/v1/health, not TCP-only)
+$healthUrl = "http://127.0.0.1:$BackendPort/api/v1/health"
+$maxAttempts = 30
+$attempt = 0
+$backendUp = $false
+while ($attempt -lt $maxAttempts) {
+    try {
+        $null = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+        $backendUp = $true
+        break
+    } catch {
+        Start-Sleep -Seconds 2
+        $attempt++
+    }
+}
+if ($backendUp) {
+    Write-Host "Backend (port $BackendPort) answered GET /api/v1/health." -ForegroundColor Green
+} else {
+    Write-Host "Backend (port $BackendPort) did not return HTTP 200 from /api/v1/health; check the backend window." -ForegroundColor Yellow
+}
+
+# 4. Run server (Vite dev)
+Write-Host "Starting Vite frontend on port $WebPort ..." -ForegroundColor Green
+
+# 4b. Launch background task to open browser once frontend is ready (Auto-opened by Antigravity)
+$frontendUrl = "http://127.0.0.1:$WebPort/"
+$pollAndOpen = "for (`$i = 0; `$i -lt 60; `$i++) { try { `$null = Invoke-WebRequest -Uri '$frontendUrl' -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop; Start-Process '$frontendUrl'; exit } catch { Start-Sleep -Seconds 1 } }"
+Start-Process powershell -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-Command", $pollAndOpen
+
+Write-Host "Browser will open automatically when Vite is ready." -ForegroundColor Gray
+if ($SkipFrontend) { return }
+npm run dev -- --port $WebPort --host
+
+
+
+
+_PortHelpers }
+$SkipFrontend = $Headless
+
+# --- SOTA Headless Standard ---
+if ($Headless -and ($Host.UI.RawUI.WindowTitle -notmatch 'Hidden')) {
+    Start-Process pwsh -ArgumentList '-NoProfile', '-File', $PSCommandPath, '-Headless' -WindowStyle Hidden
+    exit
+}
+$WindowStyle = if ($Headless) { 'Hidden' } else { 'Normal' }
+# ------------------------------
+
+# Webapp Start - Standardized SOTA (Auto-Repaired V2.5)
+$WebPort = 10838
+$BackendPort = 10839
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+
+# 1. Kill any process squatting on the ports
+Write-Host "Checking for port squatters on $WebPort and $BackendPort..." -ForegroundColor Yellow
+$pids = Get-NetTCPConnection -LocalPort $WebPort, $BackendPort -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 4 } | Select-Object -ExpandProperty OwningProcess -Unique
+foreach ($p in $pids) {
+    Write-Host "Found squatter (PID: $p). Terminating..." -ForegroundColor Red
+    try { Stop-Process -Id $p -Force -ErrorAction Stop } catch { Write-Host "Warning: Could not terminate PID $p." -ForegroundColor Gray }
+}
+
+# 2. Setup
+Set-Location $PSScriptRoot
+if (-not (Test-Path "node_modules")) { npm install }
+
+# 3. Start the Python backend (Background) from project root so immich_mcp package resolves
+Write-Host "Starting Python backend on port $BackendPort ..." -ForegroundColor Cyan
+$backendCmd = "Set-Location '$ProjectRoot'; uv run --project '$ProjectRoot' uvicorn immich_mcp.server:app --host 127.0.0.1 --port $BackendPort --log-level info"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -WindowStyle Normal
+
+# 3b. Wait for HTTP health (fleet probe uses GET /api/v1/health, not TCP-only)
+$healthUrl = "http://127.0.0.1:$BackendPort/api/v1/health"
+$maxAttempts = 30
+$attempt = 0
+$backendUp = $false
+while ($attempt -lt $maxAttempts) {
+    try {
+        $null = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+        $backendUp = $true
+        break
+    } catch {
+        Start-Sleep -Seconds 2
+        $attempt++
+    }
+}
+if ($backendUp) {
+    Write-Host "Backend (port $BackendPort) answered GET /api/v1/health." -ForegroundColor Green
+} else {
+    Write-Host "Backend (port $BackendPort) did not return HTTP 200 from /api/v1/health; check the backend window." -ForegroundColor Yellow
+}
+
+# 4. Run server (Vite dev)
+Write-Host "Starting Vite frontend on port $WebPort ..." -ForegroundColor Green
+
+# 4b. Launch background task to open browser once frontend is ready (Auto-opened by Antigravity)
+$frontendUrl = "http://127.0.0.1:$WebPort/"
+$pollAndOpen = "for (`$i = 0; `$i -lt 60; `$i++) { try { `$null = Invoke-WebRequest -Uri '$frontendUrl' -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop; Start-Process '$frontendUrl'; exit } catch { Start-Sleep -Seconds 1 } }"
+Start-Process powershell -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-Command", $pollAndOpen
+
+Write-Host "Browser will open automatically when Vite is ready." -ForegroundColor Gray
+if ($SkipFrontend) { return }
+npm run dev -- --port $WebPort --host
+
 
 
 
