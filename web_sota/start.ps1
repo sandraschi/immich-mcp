@@ -31,20 +31,25 @@ Write-Host "Starting Python backend on port $BackendPort ..." -ForegroundColor C
 $backendCmd = "Set-Location '$ProjectRoot'; uv run --project '$ProjectRoot' uvicorn immich_mcp.server:app --host 127.0.0.1 --port $BackendPort --log-level info"
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -WindowStyle Normal
 
-# 3b. Wait and verify backend is listening
-$maxAttempts = 6
+# 3b. Wait for HTTP health (fleet probe uses GET /api/v1/health, not TCP-only)
+$healthUrl = "http://127.0.0.1:$BackendPort/api/v1/health"
+$maxAttempts = 30
 $attempt = 0
 $backendUp = $false
 while ($attempt -lt $maxAttempts) {
-    Start-Sleep -Seconds 2
-    $conn = Get-NetTCPConnection -LocalPort $BackendPort -State Listen -ErrorAction SilentlyContinue
-    if ($conn) { $backendUp = $true; break }
-    $attempt++
+    try {
+        $null = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+        $backendUp = $true
+        break
+    } catch {
+        Start-Sleep -Seconds 2
+        $attempt++
+    }
 }
 if ($backendUp) {
-    Write-Host "Backend (port $BackendPort) is up." -ForegroundColor Green
+    Write-Host "Backend (port $BackendPort) answered GET /api/v1/health." -ForegroundColor Green
 } else {
-    Write-Host "Backend (port $BackendPort) not responding after $($maxAttempts * 2)s; check the backend window." -ForegroundColor Yellow
+    Write-Host "Backend (port $BackendPort) did not return HTTP 200 from /api/v1/health; check the backend window." -ForegroundColor Yellow
 }
 
 # 4. Run server (Vite dev)
