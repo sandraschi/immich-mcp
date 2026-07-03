@@ -226,9 +226,9 @@ class PhotoSearchResult(BaseModel):
     id: str = Field(description="Photo asset ID")
     original_filename: str = Field(description="Original filename")
     file_path: str = Field(description="File path on server")
-    device_asset_id: str | None = Field(default=None, description="Device asset identifier")
-    owner_id: str | None = Field(default=None, description="Owner user ID")
-    device_id: str | None = Field(default=None, description="Device ID")
+    device_asset_id: str = Field(description="Device asset identifier")
+    owner_id: str = Field(description="Owner user ID")
+    device_id: str = Field(description="Device ID")
     type: str = Field(description="Asset type (IMAGE/VIDEO)")
     created_at: str = Field(description="Creation timestamp")
     updated_at: str = Field(description="Last update timestamp")
@@ -1474,23 +1474,6 @@ async def delete_photos(
 # ====== PHASE 2 CATEGORY 1: ALBUM MANAGEMENT (4 tools) ======
 
 
-def _get_album_owner_id(album_data: dict) -> str:
-    """Extract owner ID from album data, supporting legacy ownerId and v3.0.0 users list."""
-    if "ownerId" in album_data:
-        return album_data["ownerId"] or ""
-
-    # v3.0.0 fallback: look in users array for role = owner
-    for user in album_data.get("users", []):
-        if user.get("role") == "owner":
-            return user.get("id", "")
-
-    # As a last resort, check if there's any user
-    for user in album_data.get("users", []):
-        return user.get("id", "")
-
-    return ""
-
-
 @mcp.tool()
 async def create_album(name: str, description: str | None = None, asset_ids: list[str] | None = None) -> AlbumResult:
     r"""Create a new album with optional assets and description.
@@ -1601,7 +1584,7 @@ async def create_album(name: str, description: str | None = None, asset_ids: lis
             description=result.get("description"),
             created_at=result["createdAt"],
             asset_count=result.get("assetCount", 0),
-            owner_id=_get_album_owner_id(result),
+            owner_id=result["ownerId"],
         )
 
     except ImmichAPIError as e:
@@ -1770,7 +1753,7 @@ async def list_albums(*, shared: bool | None = None, include_stats: bool = True)
                 created_at=album_data["createdAt"],
                 updated_at=album_data["updatedAt"],
                 asset_count=album_data.get("assetCount", 0),
-                owner_id=_get_album_owner_id(album_data),
+                owner_id=album_data["ownerId"],
                 shared=album_data.get("shared", False),
                 album_thumbnail_asset_id=album_data.get("albumThumbnailAssetId"),
                 start_date=album_data.get("startDate"),
@@ -2815,161 +2798,6 @@ async def get_user_libraries(username: str | None = None) -> dict:
             "user": username or "current",
             "suggestion": "Verify user exists and has library access permissions",
         }
-
-
-@mcp.tool()
-async def download_photo_to_temp(photo_id: str) -> dict:
-    """Download the original photo or video asset from Immich to a local temporary path.
-
-    This acts as a bridge when combining Immich with local media editing tools
-    such as GIMP (via gimp-mcp). You download the file, pass its local path to GIMP,
-    and then upload the modified file back.
-
-    Parameters:
-        photo_id (str, REQUIRED):
-            The UUID of the photo/video asset to download.
-    """
-    try:
-        from .bridge import download_asset_to_temp
-        local_path = await download_asset_to_temp(photo_id)
-        return {
-            "success": True,
-            "message": f"Successfully downloaded photo {photo_id} to {local_path}",
-            "local_path": local_path,
-        }
-    except Exception as e:
-        logger.error(f"Failed to download photo {photo_id}: {e}")
-        return {"success": False, "error": str(e)}
-
-
-@mcp.tool()
-async def sync_metadata_to_exif(photo_id: str, local_path: str) -> dict:
-    """Sync an asset's metadata (description, location, dates) from Immich back into a local file's EXIF.
-
-    Updates the EXIF headers of the specified local image file using metadata retrieved from Immich.
-    Supports description, GPS location, and creation date.
-
-    Parameters:
-        photo_id (str, REQUIRED):
-            The Immich asset UUID to retrieve metadata from.
-        local_path (str, REQUIRED):
-            The absolute path of the local photo file to update.
-    """
-    import piexif
-    from pathlib import Path
-
-    path = Path(local_path)
-    if not path.exists():
-        return {"success": False, "error": f"Local file not found: {local_path}"}
-
-    try:
-        client = await get_api_client()
-        # Get asset info
-        asset_info = await client.get_asset_info(photo_id)
-        if not asset_info:
-            return {"success": False, "error": f"Immich asset not found: {photo_id}"}
-
-        # Load EXIF
-        try:
-            exif_dict = piexif.load(str(path))
-        except Exception:
-            exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}
-
-        updated_fields = []
-
-        # 1. Update Description (ImageDescription in 0th IFD, key 270)
-        description = asset_info.get("exifInfo", {}).get("description") or asset_info.get("description")
-        if description:
-            exif_dict["0th"][piexif.ImageIFD.ImageDescription] = description.encode("utf-8")
-            updated_fields.append("description")
-
-        # 2. Update Date/Time
-        created_at = asset_info.get("localDateTime") or asset_info.get("createdAt")
-        if created_at:
-            try:
-                # Convert ISO to EXIF format YYYY:MM:DD HH:MM:SS
-                dt_str = created_at.replace("-", ":").replace("T", " ")[:19]
-                exif_dict["0th"][piexif.ImageIFD.DateTime] = dt_str.encode("utf-8")
-                exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal] = dt_str.encode("utf-8")
-                exif_dict["Exif"][piexif.ExifIFD.DateTimeDigitized] = dt_str.encode("utf-8")
-                updated_fields.append("date_time")
-            except Exception:
-                pass
-
-        # 3. Update GPS
-        exif_gps = asset_info.get("exifInfo", {})
-        lat = exif_gps.get("latitude")
-        lon = exif_gps.get("longitude")
-        if lat is not None and lon is not None:
-            def deg_to_dms(deg):
-                abs_deg = abs(deg)
-                d = int(abs_deg)
-                md = (abs_deg - d) * 60
-                m = int(md)
-                s = int(round((md - m) * 60 * 100))
-                return ((d, 1), (m, 1), (s, 100))
-
-            exif_dict["GPS"][piexif.GPSIFD.GPSLatitudeRef] = b"N" if lat >= 0 else b"S"
-            exif_dict["GPS"][piexif.GPSIFD.GPSLatitude] = deg_to_dms(lat)
-            exif_dict["GPS"][piexif.GPSIFD.GPSLongitudeRef] = b"E" if lon >= 0 else b"W"
-            exif_dict["GPS"][piexif.GPSIFD.GPSLongitude] = deg_to_dms(lon)
-            updated_fields.append("gps")
-
-        if not updated_fields:
-            return {"success": True, "message": "No metadata to sync.", "updated_fields": []}
-
-        # Write EXIF back
-        exif_bytes = piexif.dump(exif_dict)
-        piexif.insert(exif_bytes, str(path))
-
-        return {
-            "success": True,
-            "message": f"Successfully synced metadata ({', '.join(updated_fields)}) to {path.name}",
-            "updated_fields": updated_fields,
-        }
-    except Exception as e:
-        logger.error(f"Failed to sync EXIF metadata: {e}")
-        return {"success": False, "error": str(e)}
-
-
-@mcp.tool()
-async def detect_similar_photos() -> dict:
-    """Retrieve groups of duplicate or highly similar photos identified by Immich's machine learning engine.
-
-    Returns a list of duplicate groups, including asset details (IDs, filenames, sizes)
-    and suggested assets to keep.
-    """
-    try:
-        client = await get_api_client()
-        result = await client._get("/duplicates")
-
-        # Format the output for readability
-        formatted_groups = []
-        for group in result:
-            assets = []
-            for asset in group.get("assets", []):
-                assets.append({
-                    "id": asset.get("id"),
-                    "filename": asset.get("originalFileName"),
-                    "size_bytes": asset.get("exifInfo", {}).get("fileSizeInBytes") or asset.get("fileSizeBytes", 0),
-                    "created_at": asset.get("localDateTime") or asset.get("createdAt"),
-                })
-
-            formatted_groups.append({
-                "duplicate_id": group.get("duplicateId"),
-                "suggested_keep_ids": group.get("suggestedKeepAssetIds", []),
-                "assets": assets,
-            })
-
-        return {
-            "success": True,
-            "duplicate_groups": formatted_groups,
-            "count": len(formatted_groups),
-            "message": f"Retrieved {len(formatted_groups)} groups of duplicate assets.",
-        }
-    except Exception as e:
-        logger.error(f"Failed to detect similar photos: {e}")
-        return {"success": False, "error": str(e)}
 
 
 def main():

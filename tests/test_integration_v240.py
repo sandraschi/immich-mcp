@@ -13,36 +13,38 @@ from immich_mcp.config import ImmichConfig
 from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError
 
 
+@pytest.fixture(scope="session")
+def immich_config():
+    """Get real Immich configuration from environment"""
+    server_url = os.getenv("IMMICH_SERVER_URL", "http://localhost:2283")
+    api_key = os.getenv("IMMICH_API_KEY")
+
+    if not api_key:
+        pytest.skip("IMMICH_API_KEY environment variable not set")
+
+    return ImmichConfig(
+        server_url=server_url,
+        api_key=api_key,
+        timeout=60,  # Longer timeout for real server
+    )
+
+
+@pytest.fixture(scope="session")
+async def api_client(immich_config):
+    """Create API client connected to real server"""
+    client = ImmichAPIClient(immich_config)
+
+    # Test connection
+    try:
+        await client._get("/server/about")
+    except Exception as e:
+        pytest.skip(f"Cannot connect to Immich server: {e}")
+
+    return client
+
+
 class TestImmichV240Integration:
     """Integration tests against real Immich v2.4.0 server"""
-
-    @pytest.fixture(scope="session")
-    def immich_config(self):
-        """Get real Immich configuration from environment"""
-        server_url = os.getenv("IMMICH_SERVER_URL", "http://localhost:2283")
-        api_key = os.getenv("IMMICH_API_KEY")
-
-        if not api_key:
-            pytest.skip("IMMICH_API_KEY environment variable not set")
-
-        return ImmichConfig(
-            server_url=server_url,
-            api_key=api_key,
-            timeout=60,  # Longer timeout for real server
-        )
-
-    @pytest.fixture(scope="session")
-    async def api_client(self, immich_config):
-        """Create API client connected to real server"""
-        client = ImmichAPIClient(immich_config)
-
-        # Test connection
-        try:
-            await client.get_server_info()
-        except Exception as e:
-            pytest.skip(f"Cannot connect to Immich server: {e}")
-
-        return client
 
     class TestSearchMetadataEndpoint:
         """Test the new search/metadata endpoint integration"""

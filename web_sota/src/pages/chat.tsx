@@ -1,3 +1,4 @@
+import { API_BASE } from "@/lib/api";
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,7 @@ export function Chat() {
 
     useEffect(() => {
         // Fetch providers
-        fetch("/api/v1/llm/providers")
+        fetch(API_BASE + "/api/v1/llm/providers")
             .then(res => res.json())
             .then(data => {
                 if (data.success) setProviders(data.providers);
@@ -60,7 +61,7 @@ export function Chat() {
 
     useEffect(() => {
         // Fetch models for provider
-        fetch(`/api/v1/llm/models?provider=${selectedProvider}`)
+        fetch(API_BASE + `/api/v1/llm/models?provider=${selectedProvider}`)
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
@@ -90,7 +91,7 @@ export function Chat() {
         setLoading(true);
 
         try {
-            const res = await fetch("/api/v1/chat", {
+            const res = await fetch(API_BASE + "/api/v1/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

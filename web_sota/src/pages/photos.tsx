@@ -1,3 +1,4 @@
+import { API_BASE } from "@/lib/api";
 import { useState, useMemo, useEffect } from 'react';
 import { Loader2, Search, Image as ImageIcon, Calendar } from 'lucide-react';
 
@@ -20,7 +21,7 @@ export function Photos() {
         setError(null);
         setMode('timeline');
         try {
-            const res = await fetch('/api/v1/photos/timeline?page=1&limit=200');
+            const res = await fetch(API_BASE + '/api/v1/photos/timeline?page=1&limit=200');
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
                 const msg = (body as { detail?: string }).detail || res.statusText || 'Failed to load timeline';
@@ -51,7 +52,7 @@ export function Photos() {
         setError(null);
         setMode('search');
         try {
-            const res = await fetch(`/api/v1/photos/search?query=${encodeURIComponent(query)}&search_type=smart&limit=100`);
+            const res = await fetch(API_BASE + `/api/v1/photos/search?query=${encodeURIComponent(query)}&search_type=smart&limit=100`);
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
                 const msg = (body as { detail?: string }).detail || res.statusText || 'Search failed';
@@ -167,7 +168,7 @@ export function Photos() {
                                     {monthPhotos.map(photo => (
                                         <div key={photo.id} className="group relative aspect-square bg-slate-900 rounded-2xl overflow-hidden border border-slate-800/50 hover:border-primary/50 transition-all duration-500 hover:shadow-[0_20px_50px_rgba(0,0,0,0.5)] hover:shadow-primary/5 hover:-translate-y-2 cursor-pointer shadow-lg shadow-black/20">
                                             <img
-                                                src={`/api/v1/photos/${photo.id}/thumbnail`}
+                                                src={API_BASE + `/api/v1/photos/${photo.id}/thumbnail`}
                                                 alt={photo.original_filename}
                                                 className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110 filter brightness-90 group-hover:brightness-105"
                                                 loading="lazy"

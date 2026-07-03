@@ -165,7 +165,7 @@ async def upload_photos(
     try:
         from ...server import upload_photos as upload_tool
 
-        return await upload_tool(file_paths, album_name, auto_organize)
+        return await upload_tool(file_paths, album_name, auto_organize=auto_organize)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

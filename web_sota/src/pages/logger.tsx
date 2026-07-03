@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { API_BASE } from "@/lib/api";
 import { Terminal, RefreshCcw, Download } from "lucide-react";
 
 export function Logger() {
@@ -12,7 +13,7 @@ export function Logger() {
     const fetchLogs = async () => {
         setLoading(true);
         try {
-            const res = await fetch("/api/v1/logs?limit=200");
+            const res = await fetch(API_BASE + "/api/v1/logs?limit=200");
             const data = await res.json();
             if (data.success) {
                 setLogs(data.logs);

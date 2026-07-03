@@ -66,38 +66,51 @@ def mock_immich_client():
         client.api_key = TEST_CONFIG["immich_api_key"]
 
         # Set up mock methods
-        client.initialize = AsyncMock(return_value=None)
         client.close = AsyncMock(return_value=None)
         client.search_photos = AsyncMock(return_value=[])
-        client.upload_photo = AsyncMock(return_value={"id": "test-photo-id"})
-        client.get_photo_info = AsyncMock(return_value={"id": "test-photo-id"})
+        client.upload_photos_batch = AsyncMock(
+            return_value={
+                "uploaded_assets": ["test-photo-id"],
+                "uploaded_count": 1,
+                "error_count": 0,
+                "duplicate_count": 0,
+                "errors": [],
+                "total_size_mb": 0.1,
+            }
+        )
+        client.get_asset_info = AsyncMock(
+            return_value={
+                "id": "test-photo-id",
+                "originalFileName": "test.jpg",
+                "createdAt": "2026-01-01T00:00:00Z",
+            }
+        )
 
         mock.return_value = client
         yield client
 
 
+@pytest.fixture(autouse=True)
+def setup_api_client(mock_immich_client):
+    import immich_mcp.immich_api as api_mod
+    api_mod.api_client = mock_immich_client
+
+
 @pytest.fixture
 def test_app(mock_immich_client, mock_settings):
-    """Create a test FastMCP application."""
-    # Create FastMCP settings
-    config = FastMCPSettings(
-        name=mock_settings.app_name,
-        version=mock_settings.app_version,
-        description="Test ImmichMCP server",
-    )
-
-    app = ImmichMCP(config=config)
-
-    # Store the mock client on the app instance for test access
-    app.immich_client = mock_immich_client
-
-    return app
+    """Get the test FastMCP application."""
+    from immich_mcp.server import mcp
+    mcp.immich_client = mock_immich_client
+    return mcp
 
 
 @pytest.fixture
 def test_client(test_app):
     """Create a test client for the FastAPI app."""
-    with TestClient(test_app.app) as client:
+    from immich_mcp.server import app
+    import immich_mcp.immich_api as api_mod
+    api_mod.api_client = test_app.immich_client
+    with TestClient(app) as client:
         yield client
 
 

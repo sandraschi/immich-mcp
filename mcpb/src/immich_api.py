@@ -3,7 +3,6 @@ Immich API Client for MCP integration
 Austrian efficiency for Sandra's 2000+ photo library management
 """
 
-import contextlib
 import logging
 from pathlib import Path
 
@@ -697,6 +696,87 @@ class ImmichAPIClient:
             "errors": ["Export functionality requires additional implementation"],
         }
 
+        """Get server storage and usage statistics
+
+        Note: Immich v2.4.0 does not have /server-info endpoint.
+        This method provides basic stats from available endpoints.
+        """
+        try:
+            # Try to get server info (may not exist in v2.4.0)
+            server_info = {}
+            try:
+                server_info = await self._get("/server-info")
+            except ImmichAPIError as e:
+                if "404" in str(e) or "not found" in str(e).lower():
+                    # v2.4.0 doesn't have server-info endpoint, get basic stats differently
+                    pass
+                else:
+                    raise
+
+            # Get storage info if available
+            try:
+                storage_info = await self._get("/admin/storage")
+            except Exception:
+                storage_info = {}
+
+            # Get basic asset count from search endpoint
+            asset_count = 0
+            from contextlib import suppress
+
+            with suppress(Exception):
+                search_result = await self._get("/search/metadata", params={"page": 1, "size": 1, "type": "ASSET"})
+                asset_count = search_result.get("assets", {}).get("total", 0)
+
+            # Get album count
+            album_count = 0
+            with suppress(Exception):
+                albums_result = await self._get("/albums")
+                album_count = (
+                    len(albums_result) if isinstance(albums_result, list) else albums_result.get("total", 0)
+                )
+
+            # Combine information
+            return {
+                "usage": storage_info.get("diskUsage", 0),
+                "available": storage_info.get("diskAvailable", 0),
+                "total": storage_info.get("diskSize", 0),
+                "usage_percentage": storage_info.get("diskUsagePercentage", 0.0),
+                "photos": asset_count,  # Estimated from search results
+                "videos": 0,  # Cannot determine video count in v2.4.0
+                "users": server_info.get("users", 1),
+                "albums": album_count,
+                "usage_by_user": storage_info.get("usageByUser", []),
+                "api_version": "2.4.0+",  # Indicate we're working with v2.4.0+
+            }
+        except Exception as e:
+            # Return basic info if detailed stats not available
+            return {
+                "usage": 0,
+                "available": 0,
+                "total": 0,
+                "usage_percentage": 0.0,
+                "photos": 0,
+                "videos": 0,
+                "users": 1,
+                "albums": 0,
+                "usage_by_user": [],
+                "api_version": "2.4.0+",
+                "error": str(e),
+            }
+
+    async def export_photos(
+        self, backup_path: str, album_ids: list[str] | None = None, *, include_metadata: bool = True
+    ) -> dict:
+        """Export photos for backup"""
+        # This would be a complex operation involving downloading assets
+        # For now, return mock results
+        return {
+            "exported_photos": 0,
+            "exported_videos": 0,
+            "total_size_mb": 0.0,
+            "album_structure_preserved": True,
+            "errors": ["Export functionality requires additional implementation"],
+        }
     async def get_libraries(self) -> list[dict]:
         """Get all available libraries.
 

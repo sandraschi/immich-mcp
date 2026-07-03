@@ -1,6 +1,14 @@
 Param([switch]$Headless)
 $SkipFrontend = $Headless
 
+# Add Bun to PATH if it exists in the default Windows profile location
+$BunPath = "$env:USERPROFILE\.bun\bin"
+if (Test-Path -Path $BunPath) {
+    if ($env:PATH -notlike "*$BunPath*") {
+        $env:PATH = "$BunPath;$env:PATH"
+    }
+}
+
 # --- SOTA Headless Standard ---
 if ($Headless -and ($Host.UI.RawUI.WindowTitle -notmatch 'Hidden')) {
     Start-Process pwsh -ArgumentList '-NoProfile', '-File', $PSCommandPath, '-Headless' -WindowStyle Hidden
@@ -31,7 +39,7 @@ foreach ($p in $pids) {
 
 # 2. Setup
 Set-Location $PSScriptRoot
-if (-not (Test-Path "node_modules")) { npm install }
+if (-not (Test-Path "node_modules")) { bun install }
 
 # 3. Start the Python backend (Background) from project root so immich_mcp package resolves
 Write-Host "Starting Python backend on port $BackendPort ..." -ForegroundColor Cyan
@@ -69,7 +77,7 @@ Start-Process powershell -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "
 
 Write-Host "Browser will open automatically when Vite is ready." -ForegroundColor Gray
 if ($SkipFrontend) { return }
-npm run dev -- --port $WebPort --host
+bun run dev -- --port $WebPort --host
 
 
 
