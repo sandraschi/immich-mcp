@@ -201,15 +201,20 @@ class ImmichAPIClient:
                 file_size = Path(file_path).stat().st_size
                 total_size_mb += file_size / (1024 * 1024)
 
+                is_server_v3 = await self.is_v3()
+
                 # Upload individual file
                 with open(file_path, "rb") as f:
                     files = {"assetData": (Path(file_path).name, f, "image/jpeg")}
                     data = {
-                        "deviceAssetId": Path(file_path).stem,
-                        "deviceId": "MCP-Upload",
                         "fileCreatedAt": Path(file_path).stat().st_ctime,
                         "fileModifiedAt": Path(file_path).stat().st_mtime,
                     }
+                    if is_server_v3:
+                        data["duration"] = "0"
+                    else:
+                        data["deviceAssetId"] = Path(file_path).stem
+                        data["deviceId"] = "MCP-Upload"
 
                     result = await self._post("/assets", data=data, files=files)
 
@@ -602,7 +607,7 @@ class ImmichAPIClient:
         person_id = target_person["id"]
         body = {"personIds": [person_id], "size": limit}
         result = await self._post("/search/smart", data=body)
-        
+
         if isinstance(result, list):
             return result
         return result.get("assets", {}).get("items", result.get("items", []))
@@ -623,10 +628,8 @@ class ImmichAPIClient:
 
             # Get storage info
             storage_info = {}
-            try:
+            with contextlib.suppress(Exception):
                 storage_info = await self._get("/admin/storage")
-            except Exception:
-                pass
 
             # Get basic asset count
             asset_count = 0
@@ -663,7 +666,7 @@ class ImmichAPIClient:
                     server_about = await self._get("/server-info")
 
             version = server_about.get("version", "v2.x")
-            
+
             # Detect capabilities
             health_checks = {
                 "database": True,
@@ -682,6 +685,19 @@ class ImmichAPIClient:
             }
         except Exception as e:
             return {"status": "error", "error": str(e)}
+
+    async def is_v3(self) -> bool:
+        """Check if the connected Immich server is version 3.0.0 or higher."""
+        with contextlib.suppress(Exception):
+            info = await self.get_server_info()
+            version = info.get("version", "")
+            # Version might be like "3.0.0", "v3.0.0", etc.
+            version_str = version.lstrip("v")
+            if version_str:
+                parts = version_str.split(".")
+                if parts[0].isdigit() and int(parts[0]) >= 3:
+                    return True
+        return False
 
     async def export_photos(
         self, backup_path: str, album_ids: list[str] | None = None, *, include_metadata: bool = True

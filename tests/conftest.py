@@ -8,9 +8,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from fastmcp.settings import Settings as FastMCPSettings
 
-from immich_mcp import ImmichMCP, get_settings
+from immich_mcp import get_settings
 from immich_mcp.immich_api import ImmichAPIClient
 
 # Test configuration
@@ -107,8 +106,8 @@ def test_app(mock_immich_client, mock_settings):
 @pytest.fixture
 def test_client(test_app):
     """Create a test client for the FastAPI app."""
-    from immich_mcp.server import app
     import immich_mcp.immich_api as api_mod
+    from immich_mcp.server import app
     api_mod.api_client = test_app.immich_client
     with TestClient(app) as client:
         yield client

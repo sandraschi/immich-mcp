@@ -1,14 +1,15 @@
-import os
 import tempfile
 from pathlib import Path
-from .immich_api import get_api_client, ImmichAPIError
+
+from .immich_api import ImmichAPIError, get_api_client
+
 
 async def download_asset_to_temp(asset_id: str) -> str:
     """Download the original file of an asset to a local temporary path.
-    
+
     Args:
         asset_id: The UUID of the asset to download.
-        
+
     Returns:
         The absolute local path of the downloaded file.
     """
@@ -23,17 +24,17 @@ async def download_asset_to_temp(asset_id: str) -> str:
             if asset_info.get("type") == "VIDEO":
                 ext = ".mp4"
             original_filename = f"{asset_id}{ext}"
-            
+
         # Download binary content
         content = await client.get_binary(f"/assets/{asset_id}/original")
-        
+
         # Save to temp directory
         temp_dir = Path(tempfile.gettempdir()) / "immich_mcp_bridge"
         temp_dir.mkdir(parents=True, exist_ok=True)
-        
+
         temp_file_path = temp_dir / original_filename
         temp_file_path.write_bytes(content)
-        
+
         return str(temp_file_path.resolve())
     except Exception as e:
         raise ImmichAPIError(f"Failed to download asset {asset_id} to temp: {e}") from e

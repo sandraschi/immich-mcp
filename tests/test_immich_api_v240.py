@@ -11,7 +11,6 @@ import pytest
 from immich_mcp.config import ImmichConfig
 from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError
 
-
 # ====== MODULE LEVEL FIXTURES ======
 
 @pytest.fixture
@@ -175,7 +174,7 @@ class TestServerInfo:
 
         with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get, \
              patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post:
-            
+
             mock_get.side_effect = [
                 server_about_response,  # /server/about
                 storage_response,       # /admin/storage

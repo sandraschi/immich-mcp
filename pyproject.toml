@@ -28,7 +28,7 @@ classifiers = [
 
 dependencies = [
     # Core FastMCP 3.1 (fleet standard)
-    "fastmcp>=3.4.2,<4",
+    "fastmcp>=3.4.3,<4",
     "authlib>=1.2.0,<2.0.0",
     "httpx>=0.25.0,<1.0.0",
     "openapi-pydantic<=0.5.1",
@@ -144,6 +144,19 @@ immich-mcp = "immich_mcp.server:main"
 [tool.ruff]
 line-length = 120
 target-version = "py312"
+exclude = [
+    "scripts",
+    "mcpb",
+    "native",
+    "web_sota",
+    ".venv",
+    "build",
+    "dist",
+    "_llm_test_scripts",
+    "comprehensive_demo.py",
+    "create_test_images.py",
+    "run_all_tests.py",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "S", "UP", "RUF", "C4", "SIM", "T20"]

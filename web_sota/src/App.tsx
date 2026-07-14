@@ -1,15 +1,15 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AppLayout } from '@/components/layout/app-layout';
-import { Dashboard } from '@/pages/dashboard';
-import { Chat } from '@/pages/chat';
-import { Settings } from '@/pages/settings';
-import { Photos } from '@/pages/photos';
-import { Albums } from '@/pages/albums';
-import { People } from '@/pages/people';
-import { Map } from '@/pages/map';
-import { Tools } from '@/pages/tools';
-import { Help } from '@/pages/help';
-import { Logger } from '@/pages/logger';
+import { AppLayout } from "@/components/layout/app-layout";
+import { Albums } from "@/pages/albums";
+import { Chat } from "@/pages/chat";
+import { Dashboard } from "@/pages/dashboard";
+import { Help } from "@/pages/help";
+import { Logger } from "@/pages/logger";
+import { Map } from "@/pages/map";
+import { People } from "@/pages/people";
+import { Photos } from "@/pages/photos";
+import { Settings } from "@/pages/settings";
+import { Tools } from "@/pages/tools";
+import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
 
 function App() {
   return (

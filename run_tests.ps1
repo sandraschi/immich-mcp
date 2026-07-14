@@ -16,16 +16,16 @@ Write-Host "=" * 50 -ForegroundColor Cyan
 Write-Host "Checking Immich server connectivity..." -ForegroundColor Yellow
 try {
     $response = Invoke-WebRequest -Uri "http://localhost:2283/api/server-info/ping" -TimeoutSec 5 -ErrorAction Stop
-    Write-Host "✓ Immich server is accessible" -ForegroundColor Green
+    Write-Host "âœ“ Immich server is accessible" -ForegroundColor Green
 } catch {
-    Write-Host "✗ Immich server not accessible at http://localhost:2283" -ForegroundColor Red
+    Write-Host "âœ- Immich server not accessible at http://localhost:2283" -ForegroundColor Red
     Write-Host "Please ensure Immich is running before testing." -ForegroundColor Yellow
     exit 1
 }
 
 # Check if .env file exists
 if (!(Test-Path ".env")) {
-    Write-Host "✗ .env file not found" -ForegroundColor Red
+    Write-Host "âœ- .env file not found" -ForegroundColor Red
     Write-Host "Please create .env file with IMMICH_API_KEY and IMMICH_URL" -ForegroundColor Yellow
     exit 1
 }
@@ -44,7 +44,7 @@ if ($photoCount -lt 5) {
 }
 
 $photoCount = (Get-ChildItem "test_photos" -File | Measure-Object).Count
-Write-Host "✓ $photoCount test photos ready" -ForegroundColor Green
+Write-Host "âœ“ $photoCount test photos ready" -ForegroundColor Green
 
 # Determine test type
 $testArgs = @()
@@ -77,12 +77,12 @@ try {
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -eq 0) {
-        Write-Host "`n✓ Test suite completed successfully!" -ForegroundColor Green
+        Write-Host "`nâœ“ Test suite completed successfully!" -ForegroundColor Green
     } else {
-        Write-Host "`n✗ Test suite completed with errors (exit code: $exitCode)" -ForegroundColor Red
+        Write-Host "`nâœ- Test suite completed with errors (exit code: $exitCode)" -ForegroundColor Red
     }
 } catch {
-    Write-Host "`n✗ Test execution failed: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "`nâœ- Test execution failed: $($_.Exception.Message)" -ForegroundColor Red
 }
 
 Write-Host "`nTest results saved to latest_test_results.json" -ForegroundColor Cyan

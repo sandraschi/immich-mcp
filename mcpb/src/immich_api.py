@@ -3,11 +3,11 @@ Immich API Client for MCP integration
 Austrian efficiency for Sandra's 2000+ photo library management
 """
 
+import contextlib
 import logging
 from pathlib import Path
 
 import httpx
-
 from immich_mcp.config import ImmichConfig, ImmichUser
 
 logger = logging.getLogger("immich_mcp.api")
@@ -601,7 +601,7 @@ class ImmichAPIClient:
         person_id = target_person["id"]
         body = {"personIds": [person_id], "size": limit}
         result = await self._post("/search/smart", data=body)
-        
+
         if isinstance(result, list):
             return result
         return result.get("assets", {}).get("items", result.get("items", []))
@@ -622,10 +622,8 @@ class ImmichAPIClient:
 
             # Get storage info
             storage_info = {}
-            try:
+            with contextlib.suppress(Exception):
                 storage_info = await self._get("/admin/storage")
-            except Exception:
-                pass
 
             # Get basic asset count
             asset_count = 0
@@ -662,7 +660,7 @@ class ImmichAPIClient:
                     server_about = await self._get("/server-info")
 
             version = server_about.get("version", "v2.x")
-            
+
             # Detect capabilities
             health_checks = {
                 "database": True,

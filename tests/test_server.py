@@ -94,6 +94,7 @@ async def test_search_photos_endpoint(test_client, mock_immich_client):
 @pytest.mark.asyncio
 async def test_download_photo_to_temp(test_app):
     from unittest.mock import patch
+
     from immich_mcp.server import download_photo_to_temp
 
     with patch("immich_mcp.bridge.download_asset_to_temp", return_value="C:/temp/photo.jpg") as mock_download:
@@ -106,6 +107,7 @@ async def test_download_photo_to_temp(test_app):
 @pytest.mark.asyncio
 async def test_sync_metadata_to_exif(test_app, mock_immich_client, tmp_path):
     from unittest.mock import patch
+
     from immich_mcp.server import sync_metadata_to_exif
 
     # Create a dummy file

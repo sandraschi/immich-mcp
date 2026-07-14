@@ -1,12 +1,12 @@
 # Immich MCP Server API Documentation
 
-**FastMCP 2.0 Implementation** | **Immich v2.0.0+ Compatible** | **Complete Photo Management**
+**FastMCP 3.4 Implementation** | **Immich v2.x & v3.0.0+ Compatible** | **Complete Photo Management**
 
 ## Overview
 
 The Immich MCP Server provides comprehensive photo library management through natural language commands via the MCP (Model Context Protocol). Built with Austrian efficiency principles: working solutions in hours, not days.
 
-**Compatibility**: Fully compatible with Immich v2.0.0+ stable release. OCR search requires Immich v2.2.0+.
+**Compatibility**: Fully compatible with Immich v2.x and v3.0.0+ stable releases. OCR search requires Immich v2.2.0+. Dynamic server version detection handles API payload and response layout changes automatically.
 
 ## Available Tools
 
@@ -93,6 +93,47 @@ Safely delete photos with optional trash/permanent deletion.
 
 ```
 Delete photo ID xyz789 permanently
+```
+
+#### `download_photo_to_temp`
+
+Download the original photo or video asset from Immich to a local temporary path. This acts as a bridge when combining Immich with local media editing tools such as GIMP (via gimp-mcp).
+
+**Parameters:**
+
+- `photo_id` (str, REQUIRED): The UUID of the photo/video asset to download.
+
+**Example:**
+
+```
+Download photo abc123 to a temporary file for editing
+```
+
+#### `sync_metadata_to_exif`
+
+Sync an asset's metadata (description, GPS location, and creation date) from Immich back into a local file's EXIF tags using `piexif`.
+
+**Parameters:**
+
+- `photo_id` (str, REQUIRED): The Immich asset UUID to retrieve metadata from.
+- `local_path` (str, REQUIRED): The absolute path of the local photo file to update.
+
+**Example:**
+
+```
+Sync metadata of photo abc123 to local file C:\Users\sandr\Pictures\edited_photo.jpg
+```
+
+#### `detect_similar_photos`
+
+Retrieve groups of duplicate or highly similar photos identified by Immich's machine learning engine, with suggested assets to keep.
+
+**Parameters:** None
+
+**Example:**
+
+```
+Detect all duplicate and similar photos in my library
 ```
 
 ### 📂 Album Management

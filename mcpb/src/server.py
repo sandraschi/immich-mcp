@@ -86,11 +86,10 @@ from typing import Any  # noqa: E402
 from dotenv import load_dotenv  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastmcp import FastMCP  # noqa: E402
-from pydantic import BaseModel, Field  # noqa: E402
-
 from immich_mcp.api.v1.routes import router as v1_router  # noqa: E402
 from immich_mcp.config import ImmichConfig, get_config  # noqa: E402
 from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError  # noqa: E402
+from pydantic import BaseModel, Field  # noqa: E402
 
 # Configure structured logging
 logging.basicConfig(
@@ -213,7 +212,7 @@ _web_app = FastAPI(
     lifespan=_web_lifespan,
 )
 _web_app.include_router(v1_router, prefix="/api/v1")
-_web_app.mount("/mcp", mcp.http_app())
+_web_app.mount("/mcp", mcp.http_app(path="/"))
 
 # Expose for uvicorn (e.g. web_sota/start.ps1)
 app = _web_app

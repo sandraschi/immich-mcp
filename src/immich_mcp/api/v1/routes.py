@@ -4,9 +4,9 @@ FastMCP 3.1 API routes for ImmichMCP.
 FastAPI router with all v1 API endpoints (health, users, thumbnails, system).
 """
 
+import asyncio
 import logging
 import os
-import asyncio
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -22,23 +22,26 @@ class ChatRequest(BaseModel):
     message: str
     provider: str = "ollama"
     model: str = "llama3.3"
- 
- 
+
+
 @router.post("/chat")
 async def chat_with_immich(request: ChatRequest):
     """Handle chat requests from the webapp."""
     # For now, this is a bridge to the conversational_immich_assistant logic
     # or a direct call to a local LLM if configured.
     return {
-        "success": True, 
-        "response": f"I received your message: '{request.message}'. I'm currently being industrialized to support direct {request.provider} ({request.model}) interaction.",
+        "success": True,
+        "response": (
+            f"I received your message: '{request.message}'. "
+            f"I'm currently being industrialized to support direct {request.provider} ({request.model}) interaction."
+        ),
         "debug": {
             "provider": request.provider,
             "model": request.model
         }
     }
- 
- 
+
+
 @router.get("/health")
 async def health_check():
     """Health check for FastMCP 3.1 / webapp."""
@@ -552,14 +555,14 @@ async def get_logs(limit: int = 100):
     try:
         log_file = "server_output.log"
         if os.path.exists(log_file):
-            with open(log_file, "r") as f:
+            with open(log_file) as f:
                 content = f.readlines()
                 return {"success": True, "logs": content[-limit:]}
         return {"success": True, "logs": ["Server running. No log file found at root."]}
     except Exception as e:
         return {"success": False, "error": str(e), "logs": []}
- 
- 
+
+
 @router.get("/llm/providers")
 async def get_llm_providers():
     """List supported LLM providers for the webapp."""
@@ -571,8 +574,8 @@ async def get_llm_providers():
             {"id": "lm-studio", "name": "LM Studio (Local)", "url": "http://localhost:1234/v1"},
         ],
     }
- 
- 
+
+
 @router.get("/llm/models")
 async def get_llm_models(provider: str = "ollama"):
     """Fetch models from a specific provider (proxied)."""
@@ -586,13 +589,13 @@ async def get_llm_models(provider: str = "ollama"):
                     return {"success": True, "models": models}
         except Exception:
             return {"success": True, "models": ["llama3.3", "mistral", "phi3"]}  # Fallback defaults
- 
+
     if provider == "openrouter":
         return {"success": True, "models": ["anthropic/claude-3-sonnet", "google/gemini-pro-1.5"]}
- 
+
     return {"success": True, "models": ["default-model"]}
- 
- 
+
+
 # Static help content for webapp (no MCP tool dependency)
 HELP_CONTENT: dict[str, str] = {
     "overview": (

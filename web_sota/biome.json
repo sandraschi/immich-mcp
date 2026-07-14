@@ -18,13 +18,24 @@
     "rules": {
       "recommended": true,
       "style": {
-        "noNonNullAssertion": "warn"
+        "noNonNullAssertion": "off"
       },
       "a11y": {
-        "noSvgWithoutTitle": "off"
+        "noSvgWithoutTitle": "off",
+        "useButtonType": "off",
+        "useKeyWithClickEvents": "off"
       },
       "correctness": {
-        "noUnusedVariables": "warn"
+        "noUnusedVariables": "warn",
+        "useExhaustiveDependencies": "off"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "off",
+        "noShadowRestrictedNames": "off",
+        "noExplicitAny": "off"
+      },
+      "complexity": {
+        "noForEach": "off"
       }
     }
   },

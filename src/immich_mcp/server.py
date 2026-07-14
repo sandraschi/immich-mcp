@@ -86,6 +86,7 @@ from typing import Any  # noqa: E402
 from dotenv import load_dotenv  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastmcp import FastMCP  # noqa: E402
+from prefab_ui.app import PrefabApp  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
 from immich_mcp.api.v1.routes import router as v1_router  # noqa: E402
@@ -171,18 +172,15 @@ mcp = ImmichMCP()
 _bridge_proxies: list[str] = []
 bridge_urls = os.getenv("MCP_BRIDGE_URLS", "")
 if bridge_urls:
-    try:
+    import contextlib
+    with contextlib.suppress(ImportError):
         from fastmcp.server import create_proxy
         for url in bridge_urls.split(","):
             url = url.strip()
             if url:
-                try:
+                with contextlib.suppress(Exception):
                     mcp.add_provider(create_proxy(url))
                     _bridge_proxies.append(url)
-                except Exception:
-                    pass
-    except ImportError:
-        pass
 
 # Register agentic workflow tools
 from .agentic import register_agentic_tools  # noqa: E402
@@ -213,7 +211,7 @@ _web_app = FastAPI(
     lifespan=_web_lifespan,
 )
 _web_app.include_router(v1_router, prefix="/api/v1")
-_web_app.mount("/mcp", mcp.http_app())
+_web_app.mount("/mcp", mcp.http_app(path="/"))
 
 # Expose for uvicorn (e.g. web_sota/start.ps1)
 app = _web_app
@@ -1475,18 +1473,34 @@ async def delete_photos(
 
 
 def _get_album_owner_id(album_data: dict) -> str:
-    """Extract owner ID from album data, supporting legacy ownerId and v3.0.0 users list."""
-    if "ownerId" in album_data:
-        return album_data["ownerId"] or ""
+    """Extract owner ID from album data, supporting legacy ownerId, users list, and v3.0.0 albumUsers list."""
+    if album_data.get("ownerId"):
+        return album_data["ownerId"]
 
-    # v3.0.0 fallback: look in users array for role = owner
+    # Support v3.0.0 albumUsers list
+    for album_user in album_data.get("albumUsers", []):
+        role = album_user.get("role")
+        user_info = album_user.get("user", album_user)
+        user_id = user_info.get("id")
+        if role == "owner" and user_id:
+            return user_id
+
+    # Fallback to legacy users list (e.g. from v2.4.x scaffold drafts)
     for user in album_data.get("users", []):
         if user.get("role") == "owner":
             return user.get("id", "")
 
-    # As a last resort, check if there's any user
+    # Last resort: return first user in albumUsers or users
+    for album_user in album_data.get("albumUsers", []):
+        user_info = album_user.get("user", album_user)
+        user_id = user_info.get("id")
+        if user_id:
+            return user_id
+
     for user in album_data.get("users", []):
-        return user.get("id", "")
+        user_id = user.get("id")
+        if user_id:
+            return user_id
 
     return ""
 
@@ -2855,8 +2869,9 @@ async def sync_metadata_to_exif(photo_id: str, local_path: str) -> dict:
         local_path (str, REQUIRED):
             The absolute path of the local photo file to update.
     """
-    import piexif
     from pathlib import Path
+
+    import piexif
 
     path = Path(local_path)
     if not path.exists():
@@ -2886,15 +2901,14 @@ async def sync_metadata_to_exif(photo_id: str, local_path: str) -> dict:
         # 2. Update Date/Time
         created_at = asset_info.get("localDateTime") or asset_info.get("createdAt")
         if created_at:
-            try:
+            import contextlib
+            with contextlib.suppress(Exception):
                 # Convert ISO to EXIF format YYYY:MM:DD HH:MM:SS
                 dt_str = created_at.replace("-", ":").replace("T", " ")[:19]
                 exif_dict["0th"][piexif.ImageIFD.DateTime] = dt_str.encode("utf-8")
                 exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal] = dt_str.encode("utf-8")
                 exif_dict["Exif"][piexif.ExifIFD.DateTimeDigitized] = dt_str.encode("utf-8")
                 updated_fields.append("date_time")
-            except Exception:
-                pass
 
         # 3. Update GPS
         exif_gps = asset_info.get("exifInfo", {})
@@ -2906,7 +2920,7 @@ async def sync_metadata_to_exif(photo_id: str, local_path: str) -> dict:
                 d = int(abs_deg)
                 md = (abs_deg - d) * 60
                 m = int(md)
-                s = int(round((md - m) * 60 * 100))
+                s = round((md - m) * 60 * 100)
                 return ((d, 1), (m, 1), (s, 100))
 
             exif_dict["GPS"][piexif.GPSIFD.GPSLatitudeRef] = b"N" if lat >= 0 else b"S"
@@ -2972,11 +2986,88 @@ async def detect_similar_photos() -> dict:
         return {"success": False, "error": str(e)}
 
 
+# ====== SOTA v12.0 FastMCP 3.4+ Features ======
+
+@mcp.prompt()
+def explain_photo_ops(topic: str) -> str:
+    """Generate a prompt to help the user discover, download, or edit photos on a specific topic."""
+    return (
+        f"Search for photos of '{topic}' in the Immich library. Once found, "
+        "show their details. If editing is desired, download the original to a "
+        "temporary folder and sync back any local EXIF edits."
+    )
+
+
+@mcp.prompt()
+def organize_vacation_photos(album_name: str) -> str:
+    """Generate a template to orchestrate organizing new photos into a vacation album."""
+    return (
+        f"Help me identify recent photos that should go into the '{album_name}' album. "
+        "Perform a smart search, create the album if it doesn't exist, and add the photo IDs."
+    )
+
+
+@mcp.resource("system://status", description="Exposes the active Immich connection and server health stats.")
+async def get_system_status() -> str:
+    """Retrieve the current active server URL and health stats from Immich."""
+    client = await get_api_client()
+    try:
+        info = await client.get_server_info()
+        version = info.get("version", "unknown")
+        status = info.get("status", "unknown")
+    except Exception as e:
+        version = "unknown"
+        status = f"error: {e}"
+    return f"Active Server: {client.base_url}\nStatus: {status}\nVersion: {version}"
+
+
+@mcp.tool(app=True)
+async def show_server_health_prefab() -> PrefabApp:
+    """Render a SOTA Prefab UI dashboard showing the server connection and health stats."""
+    from prefab_ui.components import Badge, Column, Heading, Row, Text
+    from prefab_ui.components.control_flow import ForEach
+
+    client = await get_api_client()
+    try:
+        info = await client.get_server_info()
+        version = info.get("version", "unknown")
+        status = info.get("status", "healthy")
+        features = info.get("features", [])
+    except Exception as e:
+        version = "unknown"
+        status = f"unhealthy ({e})"
+        features = []
+
+    state = {
+        "version": version,
+        "status": status,
+        "features": [{"name": f} for f in features],
+    }
+
+    with PrefabApp(state=state, css_class="p-6 bg-slate-900 text-white rounded-lg shadow-md max-w-md") as app:
+        Heading("Immich Connection Dashboard", level=1, css_class="text-2xl font-bold mb-4 text-emerald-400")
+        with Row(gap=4, css_class="mb-2"):
+            Text("API URL:", css_class="font-semibold text-slate-300")
+            Text(client.base_url, css_class="text-slate-100")
+        with Row(gap=4, css_class="mb-2"):
+            Text("Version:", css_class="font-semibold text-slate-300")
+            Text("{{ version }}", css_class="text-emerald-300")
+        with Row(gap=4, css_class="mb-4"):
+            Text("Status:", css_class="font-semibold text-slate-300")
+            Badge("{{ status }}", color="emerald" if "healthy" in status else "rose")
+
+        Heading("Server Features", level=2, css_class="text-lg font-semibold mt-4 mb-2 text-slate-200")
+        with Column(gap=2), ForEach("features"):
+            Text("• {{ name }}", css_class="text-slate-300")
+
+    return app
+
+
 def main():
     """Main entry point with unified transport handling (FastMCP 3.1)."""
     from .transport import run_server
 
-    logger.info("Starting ImmichMCP - Industrialized FastMCP 3.2.0 Server")
+    logger.info("Starting ImmichMCP - Industrialized FastMCP 3.4 Server")
     run_server(mcp, server_name="immich-mcp")
 
 

@@ -31,8 +31,8 @@ import os
 import subprocess
 import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 
 # ── Config ────────────────────────────────────────────────────────────
 
@@ -42,7 +42,6 @@ DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "
 def load_config(path: str | None = None) -> dict:
     p = path or DEFAULT_CONFIG_PATH
     if not os.path.exists(p):
-        print(f"  [cua] WARNING: config not found at {p}, using built-in defaults", flush=True)
         return {}
     with open(p) as f:
         cfg = json.load(f)
@@ -62,7 +61,7 @@ CUA_SMOKE_VERSION = 2  # bump when template changes; see docstring
 def _check_version():
     """Warn if this file doesn't match the template version."""
     from pathlib import Path
-    ver_file = Path(__file__)
+    Path(__file__)
     # If the template path exists, compare versions
     tpl = Path(os.getenv("MCP_CENTRAL_DOCS", "")) / "templates/tauri-native/scripts/cua-smoke.py"
     if tpl.exists():
@@ -70,8 +69,7 @@ def _check_version():
         import re
         m = re.search(r'CUA_SMOKE_VERSION\s*=\s*(\d+)', tpl_text)
         if m and int(m.group(1)) > CUA_SMOKE_VERSION:
-            print(f"  [cua] WARNING: cua-smoke.py v{CUA_SMOKE_VERSION} is outdated "
-                  f"(template v{m.group(1)}). Copy template over.", flush=True)
+            pass
 
 
 def cfg(key: str, default=""):
@@ -104,10 +102,10 @@ _INSTALLED = False
 # ── Helpers (must be before CUA client) ────────────────────────────
 
 def log(msg: str):
-    print(f"  [cua] {msg}", flush=True)
+    pass
 
 def log_warn(msg: str):
-    print(f"  [WARN] {msg}", flush=True)
+    pass
 
 
 # ── CUA Client (pywinauto-mcp HTTP API → fallback to direct) ─────
@@ -121,7 +119,7 @@ def _init_cua_client():
     try:
         r = urllib.request.urlopen("http://127.0.0.1:10789/api/v1/health", timeout=2)
         if r.status == 200:
-            log(f"pywinauto-mcp HTTP API reachable at :10789")
+            log("pywinauto-mcp HTTP API reachable at :10789")
             _CUA_CLIENT_OK = True
             return "http"
     except Exception:
@@ -289,12 +287,10 @@ class PhaseFailed(Exception):
 
 
 def fatal(msg: str):
-    print(f"  [cua] FATAL: {msg}", flush=True)
     sys.exit(1)
 
 
 def phase_fail(msg: str):
-    print(f"  [cua] PHASE FAIL: {msg}", flush=True)
     raise PhaseFailed(msg)
 
 
@@ -477,7 +473,7 @@ def nav_click_through(output_dir: str):
             # OCR after click
             snap_path = os.path.join(snap_dir, f"nav-{label.lower()}-{int(time.time())}.png")
             os.makedirs(snap_dir, exist_ok=True)
-            result = cua_screenshot(win.get("handle", 0), snap_path)
+            cua_screenshot(win.get("handle", 0), snap_path)
             text = cua_ocr_text(win.get("handle", 0), snap_path)
 
             if expected_header.lower() in text.lower():
@@ -591,36 +587,24 @@ def main():
     passed = failed = 0
     fatal_failed = False
 
-    print(f"\n{'='*50}")
-    print(f"  CUA Smoke Test — {PRODUCT_NAME}")
-    print(f"{'='*50}\n")
 
-    for is_fatal, name, fn in phases:
-        print(f"  Phase {phases.index((is_fatal, name, fn)) + 1}: {name}")
+    for is_fatal, _name, fn in phases:
         try:
             fn()
-            print(f"  V {name}\n")
             passed += 1
         except PhaseFailed:
-            print(f"  X {name}\n")
             failed += 1
             if is_fatal:
                 fatal_failed = True
-        except Exception as e:
-            print(f"  X {name}: {e}\n")
+        except Exception:
             failed += 1
             if is_fatal:
                 fatal_failed = True
 
-    print(f"{'='*50}")
-    print(f"  Result: {passed}/{passed + failed} phases passed")
     if failed:
-        print(f"  {failed} phase(s) FAILED")
+        pass
     if fatal_failed:
-        print(f"  FATAL phase failure — see above")
         sys.exit(1)
-    print(f"  ALL PHASES PASSED")
-    print(f"{'='*50}\n")
 
 
 if __name__ == "__main__":

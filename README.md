@@ -4,17 +4,17 @@
   <a href="https://github.com/casey/just"><img src="https://img.shields.io/badge/just-ready_to_go-7c5cfc?style=flat-square&logo=just&logoColor=white" alt="Just"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.13+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"></a>
-  <a href="https://github.com/PrefectHQ/fastmcp"><img src="https://img.shields.io/badge/FastMCP-3.2-7c5cfc?style=flat-square" alt="FastMCP"></a>
+  <a href="https://github.com/PrefectHQ/fastmcp"><img src="https://img.shields.io/badge/FastMCP-3.4-7c5cfc?style=flat-square" alt="FastMCP"></a>
 </p>
 
 
 > 📖 **[Installation Guide](INSTALL.md)** — quick start, manual setup, and troubleshooting
 
-**Industrialized FastMCP 3.1** | **Austrian Efficiency** | **Conversational AI & Sampling**
+**Industrialized FastMCP 3.4** | **Austrian Efficiency** | **Conversational AI & Sampling**
 
 Efficient Immich photo library management through the MCP (Model Context Protocol). Simple, reliable, effective.
 
-> **Status**: [SOTA v13.1] Operational with Immich v2.4.0+, FastMCP 3.1 parity, Biome-stabilized, conversational AI and sampling.
+> **Status**: [SOTA v13.1] Operational with Immich v2.x and v3.0.0+, FastMCP 3.4 parity, Biome-stabilized, conversational AI and sampling.
 
 ## Quick Start
 
@@ -31,9 +31,9 @@ This opens an interactive dashboard showing all available commands. Run `just bo
 If you don't have `just` installed:
 ### 1. Prerequisites
 - Python 3.11+
-- [Immich server](https://immich.app/) v2.4.0+ running and accessible
+- [Immich server](https://immich.app/) running and accessible
+-  **Immich v3.0.0+**: Full compatibility (Zod-validation, restructured upload/album payloads)
 -  **Immich v2.4.0+**: Full compatibility (search-based API)
--  **Immich v2.3.1**: Full compatibility
 -  **Immich v2.2.0+**: OCR search support
 - Immich API key (get from Administration  API Keys)
 
@@ -346,6 +346,37 @@ python tests/test_harness_v240.py
 4. **Server Health**
    - Check Immich server status
    - Verify API connectivity
+   - View version information
+
+   Example:
+   ```bash
+   Check server health
+   ```
+
+5. **Download Photo to Temp** (`download_photo_to_temp`)
+   - Download original asset files to local temp directory
+   - Acts as a bridge for local image editors (like GIMP)
+
+   Example:
+   ```bash
+   Download photo ID abc123 to a temporary file
+   ```
+
+6. **Sync Metadata to EXIF** (`sync_metadata_to_exif`)
+   - Sync description, GPS coordinates, and date/time from Immich back into local image EXIF tags
+
+   Example:
+   ```bash
+   Sync metadata of photo abc123 to local file edited.jpg
+   ```
+
+7. **Detect Similar Photos** (`detect_similar_photos`)
+   - Retrieve clusters of duplicates/visually similar photos from Immich's ML engine with suggested keep IDs
+
+   Example:
+   ```bash
+   Detect all similar and duplicate photos in my library
+   ```
 
 ###  Library Management (External Folders Solution)
 
@@ -396,12 +427,6 @@ List user libraries
 # Switch back to admin user
 Switch to user "sandra"
 ```
-   - View version information
-
-   Example:
-   ```bash
-   Check server health
-   ```
 
 ## Architecture
 
