@@ -7,7 +7,7 @@ name = "immich-mcp"
 version = "1.5.0"
 description = "Industrialized FastMCP 3.1 server for Immich photo management with conversational AI, sampling, and SOTA 2026 fleet standards."
 authors = [
-    {name = "Sandra", email = "sandra@example.com"}
+    {name = "Sandra Schipal", email = "sandraschipal@gmail.com"}
 ]
 readme = "README.md"
 license = {text = "MIT"}
@@ -28,7 +28,7 @@ classifiers = [
 
 dependencies = [
     # Core FastMCP 3.1 (fleet standard)
-    "fastmcp>=3.4.3,<4",
+    "fastmcp>=3.4.4,<4",
     "authlib>=1.2.0,<2.0.0",
     "httpx>=0.25.0,<1.0.0",
     "openapi-pydantic<=0.5.1",
@@ -78,11 +78,11 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/sandra/immich-mcp"
-Repository = "https://github.com/sandra/immich-mcp.git"
-Documentation = "https://sandra.github.io/immich-mcp/"
-Changelog = "https://github.com/sandra/immich-mcp/blob/main/CHANGELOG.md"
-Issues = "https://github.com/sandra/immich-mcp/issues"
+Homepage = "https://github.com/sandraschi/immich-mcp"
+Repository = "https://github.com/sandraschi/immich-mcp"
+Documentation = "https://github.com/sandraschi/immich-mcp#readme"
+Changelog = "https://github.com/sandraschi/immich-mcp/blob/main/CHANGELOG.md"
+Issues = "https://github.com/sandraschi/immich-mcp/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -90,35 +90,7 @@ namespaces = false
 
 # FastMCP 3.1 (config via env / run() where applicable)
 
-# Black code formatter configuration
-[tool.black]
-line-length = 100
-target-version = ['py311']
-include = '\.pyi?$'
-
-# Type checking configuration
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
-
-[[tool.mypy.overrides]]
-module = [
-    "fastapi.*",
-    "pydantic.*",
-    "httpx.*",
-    "starlette.*",
-]
-disallow_untyped_defs = false
+# Mypy checked via ruff
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
