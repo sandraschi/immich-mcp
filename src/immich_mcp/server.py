@@ -54,7 +54,7 @@ _is_stdio_mode = not sys.stdout.isatty()
 
 # NUCLEAR OPTION: Completely disable logger during stdio mode
 # Import logger first, then replace it with a no-op to prevent any stdout writes
-import logging  # noqa: E402
+import logging
 
 if _is_stdio_mode:
     # Replace stdout with our devnull version to catch any accidental writes
@@ -66,10 +66,10 @@ if _is_stdio_mode:
     # protocol that uses stdout.
     pass
 
-import asyncio  # noqa: E402
-from pathlib import Path  # noqa: E402
+import asyncio
+from pathlib import Path
 
-from dotenv import load_dotenv  # noqa: E402
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -79,19 +79,19 @@ load_dotenv(env_path)
 src_dir = Path(__file__).parent.parent
 if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
-from datetime import datetime  # noqa: E402
-from pathlib import Path  # noqa: E402
-from typing import Any  # noqa: E402
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from dotenv import load_dotenv  # noqa: E402
-from fastapi import FastAPI  # noqa: E402
-from fastmcp import FastMCP  # noqa: E402
-from prefab_ui.app import PrefabApp  # noqa: E402
-from pydantic import BaseModel, Field  # noqa: E402
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastmcp import FastMCP
+from prefab_ui.app import PrefabApp
+from pydantic import BaseModel, Field
 
-from immich_mcp.api.v1.routes import router as v1_router  # noqa: E402
-from immich_mcp.config import ImmichConfig, get_config  # noqa: E402
-from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError  # noqa: E402
+from immich_mcp.api.v1.routes import router as v1_router
+from immich_mcp.config import ImmichConfig, get_config
+from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError
 
 # Configure structured logging
 logging.basicConfig(
@@ -185,7 +185,7 @@ if bridge_urls:
                     _bridge_proxies.append(url)
 
 # Register agentic workflow tools
-from .agentic import register_agentic_tools  # noqa: E402
+from .agentic import register_agentic_tools
 
 register_agentic_tools()
 
@@ -194,7 +194,7 @@ if _is_stdio_mode and hasattr(sys.stdout, "restore"):
     sys.stdout.restore()
 
 # FastMCP 3.1: separate FastAPI app for custom routes; mount MCP HTTP app at /mcp
-from contextlib import asynccontextmanager  # noqa: E402
+from contextlib import asynccontextmanager
 
 
 @asynccontextmanager
@@ -456,7 +456,7 @@ class OcrInfo(BaseModel):
     has_bounding_boxes: bool = Field(description="Whether bounding box data is available (v2.3.0+)")
 
 
-from .immich_api import get_api_client  # noqa: E402
+from .immich_api import get_api_client
 
 # ====== PHASE 1: CORE PHOTO OPERATIONS (5 tools) ======
 
