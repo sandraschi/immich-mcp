@@ -1,4 +1,4 @@
-set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
+set windows-shell := ["powershell.exe", "-NoProfile", "-Command"]
 import 'scripts/just/fleet.just'
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -6,6 +6,13 @@ import 'scripts/just/fleet.just'
 # Open the interactive recipe dashboard in the browser
 default:
     @just --list
+
+# Synchronize deps, pre-commit hooks, and web SOTA frontend
+bootstrap:
+    uv sync --extra dev
+    uv run pre-commit install
+    Set-Location web_sota; npm ci; if ($LASTEXITCODE -ne 0) { npm install }
+    Write-Host "Pre-commit hooks installed." -ForegroundColor Green
 
 # ── Quality ───────────────────────────────────────────────────────────────────
 
