@@ -118,17 +118,15 @@ async def test_sync_metadata_to_exif(test_app, mock_immich_client, tmp_path):
         "id": "photo123",
         "description": "My Sunset",
         "localDateTime": "2026-06-24T20:30:00Z",
-        "exifInfo": {
-            "latitude": 48.2082,
-            "longitude": 16.3738
-        }
+        "exifInfo": {"latitude": 48.2082, "longitude": 16.3738},
     }
 
     # Mock piexif calls to avoid real image manipulation issues
-    with patch("piexif.load", return_value={"0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}), \
-         patch("piexif.dump", return_value=b"new exif bytes"), \
-         patch("piexif.insert") as mock_insert:
-
+    with (
+        patch("piexif.load", return_value={"0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}),
+        patch("piexif.dump", return_value=b"new exif bytes"),
+        patch("piexif.insert") as mock_insert,
+    ):
         result = await sync_metadata_to_exif("photo123", str(dummy_file))
         assert result["success"] is True
         assert "description" in result["updated_fields"]
@@ -147,8 +145,8 @@ async def test_detect_similar_photos(test_app, mock_immich_client):
             "suggestedKeepAssetIds": ["photo1"],
             "assets": [
                 {"id": "photo1", "originalFileName": "test1.jpg", "fileSizeBytes": 1000},
-                {"id": "photo2", "originalFileName": "test2.jpg", "fileSizeBytes": 900}
-            ]
+                {"id": "photo2", "originalFileName": "test2.jpg", "fileSizeBytes": 900},
+            ],
         }
     ]
 
@@ -157,4 +155,3 @@ async def test_detect_similar_photos(test_app, mock_immich_client):
     assert result["count"] == 1
     assert len(result["duplicate_groups"]) == 1
     assert result["duplicate_groups"][0]["duplicate_id"] == "dup1"
-

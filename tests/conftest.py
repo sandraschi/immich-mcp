@@ -92,6 +92,7 @@ def mock_immich_client():
 @pytest.fixture(autouse=True)
 def setup_api_client(mock_immich_client):
     import immich_mcp.immich_api as api_mod
+
     api_mod.api_client = mock_immich_client
 
 
@@ -99,6 +100,7 @@ def setup_api_client(mock_immich_client):
 def test_app(mock_immich_client, mock_settings):
     """Get the test FastMCP application."""
     from immich_mcp.server import mcp
+
     mcp.immich_client = mock_immich_client
     return mcp
 
@@ -108,6 +110,7 @@ def test_client(test_app):
     """Create a test client for the FastAPI app."""
     import immich_mcp.immich_api as api_mod
     from immich_mcp.server import app
+
     api_mod.api_client = test_app.immich_client
     with TestClient(app) as client:
         yield client

@@ -173,8 +173,10 @@ _bridge_proxies: list[str] = []
 bridge_urls = os.getenv("MCP_BRIDGE_URLS", "")
 if bridge_urls:
     import contextlib
+
     with contextlib.suppress(ImportError):
         from fastmcp.server import create_proxy
+
         for url in bridge_urls.split(","):
             url = url.strip()
             if url:
@@ -2845,6 +2847,7 @@ async def download_photo_to_temp(photo_id: str) -> dict:
     """
     try:
         from .bridge import download_asset_to_temp
+
         local_path = await download_asset_to_temp(photo_id)
         return {
             "success": True,
@@ -2902,6 +2905,7 @@ async def sync_metadata_to_exif(photo_id: str, local_path: str) -> dict:
         created_at = asset_info.get("localDateTime") or asset_info.get("createdAt")
         if created_at:
             import contextlib
+
             with contextlib.suppress(Exception):
                 # Convert ISO to EXIF format YYYY:MM:DD HH:MM:SS
                 dt_str = created_at.replace("-", ":").replace("T", " ")[:19]
@@ -2915,6 +2919,7 @@ async def sync_metadata_to_exif(photo_id: str, local_path: str) -> dict:
         lat = exif_gps.get("latitude")
         lon = exif_gps.get("longitude")
         if lat is not None and lon is not None:
+
             def deg_to_dms(deg):
                 abs_deg = abs(deg)
                 d = int(abs_deg)
@@ -2962,18 +2967,22 @@ async def detect_similar_photos() -> dict:
         for group in result:
             assets = []
             for asset in group.get("assets", []):
-                assets.append({
-                    "id": asset.get("id"),
-                    "filename": asset.get("originalFileName"),
-                    "size_bytes": asset.get("exifInfo", {}).get("fileSizeInBytes") or asset.get("fileSizeBytes", 0),
-                    "created_at": asset.get("localDateTime") or asset.get("createdAt"),
-                })
+                assets.append(
+                    {
+                        "id": asset.get("id"),
+                        "filename": asset.get("originalFileName"),
+                        "size_bytes": asset.get("exifInfo", {}).get("fileSizeInBytes") or asset.get("fileSizeBytes", 0),
+                        "created_at": asset.get("localDateTime") or asset.get("createdAt"),
+                    }
+                )
 
-            formatted_groups.append({
-                "duplicate_id": group.get("duplicateId"),
-                "suggested_keep_ids": group.get("suggestedKeepAssetIds", []),
-                "assets": assets,
-            })
+            formatted_groups.append(
+                {
+                    "duplicate_id": group.get("duplicateId"),
+                    "suggested_keep_ids": group.get("suggestedKeepAssetIds", []),
+                    "assets": assets,
+                }
+            )
 
         return {
             "success": True,
@@ -2987,6 +2996,7 @@ async def detect_similar_photos() -> dict:
 
 
 # ====== SOTA v12.0 FastMCP 3.4+ Features ======
+
 
 @mcp.prompt()
 def explain_photo_ops(topic: str) -> str:

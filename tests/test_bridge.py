@@ -11,11 +11,9 @@ from immich_mcp.immich_api import ImmichAPIError
 async def test_download_asset_to_temp_success():
     # Setup mock client
     mock_client = AsyncMock()
-    mock_client.get_asset_info = AsyncMock(return_value={
-        "id": "test-asset-123",
-        "originalFileName": "myphoto.jpg",
-        "type": "IMAGE"
-    })
+    mock_client.get_asset_info = AsyncMock(
+        return_value={"id": "test-asset-123", "originalFileName": "myphoto.jpg", "type": "IMAGE"}
+    )
     mock_client.get_binary = AsyncMock(return_value=b"fake jpeg data")
 
     with patch("immich_mcp.bridge.get_api_client", return_value=mock_client):
@@ -34,13 +32,11 @@ async def test_download_asset_to_temp_success():
         # Clean up temp file
         path.unlink()
 
+
 @pytest.mark.asyncio
 async def test_download_asset_to_temp_no_filename():
     mock_client = AsyncMock()
-    mock_client.get_asset_info = AsyncMock(return_value={
-        "id": "test-asset-123",
-        "type": "VIDEO"
-    })
+    mock_client.get_asset_info = AsyncMock(return_value={"id": "test-asset-123", "type": "VIDEO"})
     mock_client.get_binary = AsyncMock(return_value=b"fake video data")
 
     with patch("immich_mcp.bridge.get_api_client", return_value=mock_client):
@@ -52,6 +48,7 @@ async def test_download_asset_to_temp_no_filename():
         assert path.read_bytes() == b"fake video data"
 
         path.unlink()
+
 
 @pytest.mark.asyncio
 async def test_download_asset_to_temp_failure():

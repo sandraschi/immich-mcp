@@ -13,6 +13,7 @@ from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError
 
 # ====== MODULE LEVEL FIXTURES ======
 
+
 @pytest.fixture
 def config():
     """Create test configuration"""
@@ -34,6 +35,7 @@ def mock_response():
 
 
 # ====== FLAT TEST CLASSES ======
+
 
 class TestSearchMetadataEndpoint:
     """Test the photo search endpoints (which are POST requests)"""
@@ -62,9 +64,7 @@ class TestSearchMetadataEndpoint:
             result = await api_client.search_photos("test query", search_type="smart")
 
             # Verify correct endpoint and body parameters
-            mock_post.assert_called_with(
-                "/search/smart", data={"query": "test query", "size": 50}
-            )
+            mock_post.assert_called_with("/search/smart", data={"query": "test query", "size": 50})
 
             assert len(result) == 2
             assert result[0]["id"] == "asset1"
@@ -88,9 +88,7 @@ class TestSearchMetadataEndpoint:
             result = await api_client.search_photos("vacation", search_type="filename")
 
             # Verify correct endpoint and body parameters for filename search
-            mock_post.assert_called_with(
-                "/search/metadata", data={"originalFileName": "vacation", "size": 50}
-            )
+            mock_post.assert_called_with("/search/metadata", data={"originalFileName": "vacation", "size": 50})
 
             assert len(result) == 1
             assert result[0]["originalFileName"] == "vacation_test.jpg"
@@ -113,9 +111,7 @@ class TestSearchMetadataEndpoint:
             result = await api_client.search_photos("metadata query", search_type="metadata")
 
             # Verify correct endpoint and body parameters for metadata search
-            mock_post.assert_called_with(
-                "/search/metadata", data={"query": "metadata query", "size": 50}
-            )
+            mock_post.assert_called_with("/search/metadata", data={"query": "metadata query", "size": 50})
 
             assert len(result) == 1
 
@@ -172,12 +168,13 @@ class TestServerInfo:
         }
         search_metadata_response = {"assets": {"total": 150, "count": 150, "items": []}}
 
-        with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get, \
-             patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post:
-
+        with (
+            patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get,
+            patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post,
+        ):
             mock_get.side_effect = [
                 server_about_response,  # /server/about
-                storage_response,       # /admin/storage
+                storage_response,  # /admin/storage
             ]
             mock_post.return_value = search_metadata_response  # /search/metadata
 

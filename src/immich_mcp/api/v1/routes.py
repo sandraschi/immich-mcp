@@ -35,10 +35,7 @@ async def chat_with_immich(request: ChatRequest):
             f"I received your message: '{request.message}'. "
             f"I'm currently being industrialized to support direct {request.provider} ({request.model}) interaction."
         ),
-        "debug": {
-            "provider": request.provider,
-            "model": request.model
-        }
+        "debug": {"provider": request.provider, "model": request.model},
     }
 
 
