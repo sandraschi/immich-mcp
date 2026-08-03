@@ -25,7 +25,7 @@
         "icon": ["icons/icon.png", "icons/icon.ico"],
         "resources": [
             "resources/immich-mcp-backend.exe",
-            "resources/.env"
+            "resources/.env.example"
         ],
         "windows": {
             "webviewInstallMode": {
@@ -39,6 +39,7 @@
     },
     "plugins": {}
 }
+
 
 
 
