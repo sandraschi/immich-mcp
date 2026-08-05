@@ -29,7 +29,7 @@ This test suite provides extensive testing of all Immich MCP tools with realisti
 ## Quick Start
 
 ### Prerequisites
-- **Immich server running** (v2.3.1+ or v2.4.0+ with Immich++)
+- **Immich server running** (v2.7+ verified, v3 supported)
 - **Valid API key** in `.env` file
 - **Python environment** with dependencies installed
 
@@ -221,15 +221,10 @@ asyncio.run(scaffold.test_server_health())
 
 ## Integration Testing
 
-### With Immich++
+### With a real Immich server
 ```bash
-# Start Immich++ frontend
-cd ../myai/projects/immich_plus/frontend
-npm run dev
-
-# Run MCP tests in parallel
-cd ../../immich-mcp
-python test_scaffold.py
+# Requires a valid IMMICH_SERVER_URL + IMMICH_API_KEY (see .env.example)
+uv run pytest tests/test_integration_v240.py -q
 ```
 
 ### With Claude Desktop
@@ -307,4 +302,4 @@ python test_scaffold.py
 
 **Test Suite Status**: ✅ **READY FOR COMPREHENSIVE TESTING**
 **Coverage**: 100% of MCP tools with realistic workflows
-**Compatibility**: Immich v2.3.1+ and v2.4.0+ (with Immich++)
+**Compatibility**: Immich v2.7+ (verified), v3 supported

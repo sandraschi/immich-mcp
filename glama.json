@@ -2,18 +2,57 @@
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "maintainers": ["sandraschi"],
   "name": "immich-mcp",
-  "description": "FastMCP 2.11+ server for Immich photo library management. Compatible with Immich v2.3.1+ with enhanced multilingual OCR support.",
+  "id": "immich-mcp",
+  "repository": "https://github.com/sandraschi/immich-mcp",
+  "description": "FastMCP 3.4+ server for Immich photo library management. Compatible with Immich v2.7+ (verified live) and v3.0.0+/v3.1.x (verified against the official OpenAPI spec). 33 tools: upload, CLIP smart search, OCR search, albums, people/face detection, libraries, multi-user, share links, storage stats, edits.",
+  "version": "1.6.1",
   "type": "mcp_server",
-  "status": "beta",
-  "framework": "FastMCP 2.11+",
-  "tools": 10,
-  "transport": ["stdio"],
+  "status": "active",
+  "framework": "FastMCP 3.4+",
+  "tools": [
+    "upload_photos",
+    "search_photos",
+    "update_asset_visibility",
+    "edit_photo",
+    "switch_immich_user",
+    "get_photo_info",
+    "get_ocr_data",
+    "get_asset_ocr",
+    "organize_photos_by_date",
+    "delete_photos",
+    "create_album",
+    "add_to_album",
+    "list_albums",
+    "share_album",
+    "detect_people",
+    "tag_person",
+    "search_by_person",
+    "get_storage_info",
+    "backup_photos",
+    "server_health",
+    "list_libraries",
+    "get_library_info",
+    "create_library",
+    "scan_library",
+    "manage_library",
+    "list_users",
+    "switch_user",
+    "get_current_user",
+    "get_user_libraries",
+    "download_photo_to_temp",
+    "sync_metadata_to_exif",
+    "detect_similar_photos",
+    "show_server_health_prefab"
+  ],
+  "transport": ["stdio", "http"],
   "keywords": [
     "immich",
     "photos",
     "photo-management",
     "library",
     "ocr",
+    "face-detection",
+    "albums",
     "mcp-server",
     "fastmcp"
   ],
@@ -21,9 +60,13 @@
     "photo_management": {
       "enabled": true
     },
+    "smart_search": {
+      "enabled": true,
+      "requires": "Immich ML/CLIP enabled"
+    },
     "ocr_search": {
       "enabled": true,
-      "requires": "Immich v2.3.1+"
+      "requires": "Immich v2.2.0+"
     },
     "api_integration": {
       "enabled": true,
@@ -31,4 +74,3 @@
     }
   }
 }
-

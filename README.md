@@ -32,8 +32,8 @@ If you don't have `just` installed:
 ### 1. Prerequisites
 - Python 3.11+
 - [Immich server](https://immich.app/) running and accessible
--  **Immich v3.0.0+**: Full compatibility (Zod-validation, restructured upload/album payloads)
--  **Immich v2.4.0+**: Full compatibility (search-based API)
+-  **Immich v3.0.0+ / v3.1.x**: Full compatibility (verified against the official OpenAPI spec)
+-  **Immich v2.7.x**: Full compatibility (current production contract, verified live)
 -  **Immich v2.2.0+**: OCR search support
 - Immich API key (get from Administration  API Keys)
 
@@ -59,7 +59,7 @@ Add to your `claude_desktop_config.json`:
   }
 }
 ```
-#### **Option 1: PyPI Package Install (Recommended)** 
+#### **Option 1: PyPI Package Install (Recommended)**
 
 **Simple pip installation - no repository cloning required!**
 
@@ -267,30 +267,35 @@ python src/immich_mcp/server.py
 
 For Claude Desktop integration, use the MCPB package.
 
-## API Migration Notes (v2.4.0)
+## Immich API Compatibility (v2.7+ / v3)
 
-ImmichMCP has been updated for full compatibility with Immich v2.4.0+ which uses a search-based API architecture:
+The client is verified against the official Immich OpenAPI specs for **v2.7.5**, **v3.0.3** and **v3.1.0** (checked 2026-08-06). Key contracts:
 
-### Key Changes in Immich v2.4.0
-- **Asset Discovery**: `GET /api/assets`  `POST /api/search/metadata`
-- **Individual Assets**: `GET /api/assets/:id` no longer available
-- **Server Info**: `GET /api/server-info` endpoint removed
-- **Search Architecture**: All asset access now goes through search endpoints
+| Area | Endpoint(s) |
+|------|-------------|
+| Upload | `POST /assets` (ISO-8601 `fileCreatedAt`/`fileModifiedAt`; `deviceAssetId`/`deviceId` for < v3, `duration` integer for v3) |
+| Search | `POST /search/smart`, `POST /search/metadata` |
+| Timeline | `POST /search/metadata` (`page`/`size`/`order`) — the legacy `GET /assets` was removed in v2.7 |
+| Delete/Trash | `DELETE /assets` (`force: false` = trash, `force: true` = permanent) |
+| Edits | `PUT /assets/{id}/edits` (`crop`/`rotate`/`mirror` actions, v2.5.0+) |
+| Face detection | `POST /assets/jobs` (`refresh-faces`) |
+| OCR | `GET /assets/{id}/ocr` (returns word boxes; aggregated client-side) |
+| Stats | `GET /server/storage`, `GET /server/statistics` |
+| Visibility | `PUT /assets/{id}` — enum `archive` / `timeline` / `hidden` / `locked` |
+| Libraries | `POST /libraries` (requires `ownerId`), `GET /libraries/{id}/statistics`, `POST /libraries/{id}/scan` |
 
-### ImmichMCP Adaptations
--  **Search-based asset listing** using `/api/search/metadata`
--  **Fallback asset access** via search with specific queries
--  **Server detection** without `/server-info` dependency
--  **Backward compatibility** maintained for older Immich versions
--  **Comprehensive testing** with automated compatibility checks
+Removed in v2.7+/v3 and **not used**: `GET /assets`, `POST /search/assets`, `DELETE /assets/trash`,
+`GET /admin/storage`, `GET /server-info`, `/libraries/{id}/{refresh,optimize,locations,empty-trash,clean-bundles}`.
 
 ### Testing Compatibility
 Run the built-in test harness to verify your Immich server compatibility:
 
 ```powershell
-# Test against your Immich server
-$env:IMMICH_API_KEY = "your-api-key"
-python tests/test_harness_v240.py
+# Test against your Immich server (unit + contract tests)
+uv run pytest tests/ -q
+
+# Live-server integration tests (requires valid IMMICH_SERVER_URL + IMMICH_API_KEY)
+uv run pytest tests/test_integration_v240.py -q
 ```
 
 ## Features
@@ -536,7 +541,7 @@ python tests/integration_tests.py
 ### Austrian Efficiency Test Metrics
 
 - **Unit tests**: ~30 seconds
-- **Integration tests**: ~2 minutes  
+- **Integration tests**: ~2 minutes
 - **Coverage**: >90% of core functionality
 - **Real workflow validation**: End-to-end photo management
 
@@ -650,56 +655,24 @@ This project adheres to **SOTA 14.1** industrial standards for high-fidelity age
 - **[FastMCP](https://github.com/jlowin/fastmcp)**: Framework for building MCP servers
 - **[MCP Protocol](https://spec.modelcontextprotocol.io/)**: Model Context Protocol specification
 
-##  API Migration Notes
+##  API Compatibility Status
 
-### Immich v2.4.0 Compatibility Status
-
-**Status:**  **REQUIRES MIGRATION**  
-**Issue:** Immich v2.4.0 changed from direct REST API to search-based asset access  
-**Impact:** Current ImmichMCP version will fail with "Invalid API key" or 404 errors  
-**Affected:** All asset listing and retrieval operations
-
-#### What Changed in Immich v2.4.0
-
-Immich completely redesigned their asset access API:
-
-| Operation | Old API (v2.3.1) | New API (v2.4.0) |
-|-----------|------------------|------------------|
-| List Assets | `GET /api/assets` | `POST /api/search/metadata` |
-| Get Asset | `GET /api/assets/:id` | **Not Available** |
-| Search Assets | Multiple endpoints | Unified search API |
-
-#### Current Workaround
-
-For Immich v2.4.0, use [Immich++](https://github.com/sandraschi/immich-plus) which has been updated to handle the new API architecture.
-
-#### Migration Plan
-
-1. **Update asset retrieval logic** to use search API
-2. **Replace direct asset access** with search-based queries
-3. **Test all operations** against v2.4.0
-4. **Update documentation** with new compatibility matrix
-
-#### Alternative Solutions
-
-- **Stay on Immich v2.3.1** - Full compatibility with current ImmichMCP
-- **Use Immich++** - Modern web frontend with v2.4.0 support
-- **Wait for migration** - Updated ImmichMCP version coming soon
-
-### Version Compatibility Matrix
+### Immich Version Compatibility Matrix
 
 | Immich Version | ImmichMCP Status | Notes |
 |----------------|------------------|-------|
-| **v2.4.0** |  **Broken** | API migration required |
-| **v2.3.1** |  **Working** | Full compatibility |
-| **v2.2.0** |  **Working** | OCR search support |
-| **v2.0.0** |  **Working** | Basic operations |
+| **v3.1.x** | ✅ Working | Verified against official OpenAPI spec (2026-08-06) |
+| **v3.0.x** | ✅ Working | Breaking changes handled (upload payload, album users) |
+| **v2.7.x** | ✅ Working | Current production contract; verified live |
+| **v2.4-2.6** | ✅ Working | Search-based API (older contract) |
+| **v2.3.1** | ✅ Working | Basic + OCR operations |
+| **v2.0-2.2** | ✅ Working | Basic operations |
 
 ---
 
 ##  Changelog
 
-### v1.4.0 (2025-12-18) - Dual Transport Architecture 
+### v1.4.0 (2025-12-18) - Dual Transport Architecture
 
 -  **Dual transport implemented** - MCP stdio + HTTP REST API support
 -  **HTTP REST API endpoints** - All 15+ MCP tools available via HTTP
@@ -708,7 +681,7 @@ For Immich v2.4.0, use [Immich++](https://github.com/sandraschi/immich-plus) whi
 -  **Comprehensive API documentation** - All endpoints documented
 -  **Automatic fallback support** - Immich++ can use MCP or direct API
 
-### v1.3.0 (2025-12-18) - API Migration Discovery 
+### v1.3.0 (2025-12-18) - API Migration Discovery
 
 -  **Immich v2.4.0 compatibility issue discovered** - Major API architecture change
 -  **Search-based asset access** - New `/api/search/metadata` endpoint required
@@ -742,16 +715,21 @@ For Immich v2.4.0, use [Immich++](https://github.com/sandraschi/immich-plus) whi
 
 ---
 
-**Built with Austrian efficiency**  | **Working solutions in hours, not days**  | **Sin temor y sin esperanza** 
+**Built with Austrian efficiency**  | **Working solutions in hours, not days**  | **Sin temor y sin esperanza**
 
 
 ##  Webapp Dashboard
 
-This MCP server includes a free, premium web interface for monitoring and control.
-By default, the web dashboard runs on port **10795**.
-*(Assigned ports: **10795** (Web dashboard frontend), **10794** (Web dashboard backend (API)))*
+This MCP server includes a free, premium web interface (React + Vite + Tailwind) for monitoring and control.
+
+**Registered ports** (fleet WEBAPP_PORTS.md):
+
+| Port | Service |
+|------|---------|
+| 10838 | Webapp frontend (Vite dev) |
+| 10839 | Backend (FastAPI + MCP HTTP) |
 
 To start the webapp:
 1. Navigate to the `web_sota` directory.
 2. Run `start.bat` (Windows) or `./start.ps1` (PowerShell).
-3. Open `http://localhost:10795` in your browser.
+3. Open `http://localhost:10838` in your browser.

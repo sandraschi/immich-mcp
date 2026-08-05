@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-08-06
+
+### Fixed
+- **Timeline search (CRITICAL)**: `get_timeline_assets` called three dead endpoints
+  (`POST /search/assets` never existed, `GET /search/metadata` is POST-only, `GET /assets`
+  was removed in v2.7+) and always returned `[]`. Now uses `POST /search/metadata`
+  with `page`/`size`/`order` (verified against the official OpenAPI spec for v2.7.5, v3.0.3, v3.1.0).
+- **Upload payload (CRITICAL)**: `fileCreatedAt`/`fileModifiedAt` were sent as unix
+  epoch floats but the API requires ISO-8601 date-time strings; `duration` was sent as
+  a string on v3 where the schema type is integer. Both now conform, and the correct
+  mimetype is sent per file. Verified against the live server spec (v2.7.5) and v3.1.0.
+- **Delete/trash**: `DELETE /assets/trash` does not exist; trash and permanent delete
+  both go through `DELETE /assets` with `force: false/true` (confirmed in the v2.7.5
+  server source: `status: force ? Deleted : Trashed`).
+- **Asset edits**: `edit_asset` called `POST /assets/{id}/edit` (nonexistent); now uses
+  `PUT /assets/{id}/edits` with the `{edits: [{action, parameters}]}` contract.
+- **Face detection**: `run_face_detection` posted an invalid `FACE_DETECTION` job with
+  a `data` field the schema does not accept, and returned fabricated counts. Now queues
+  the real per-asset job (`POST /assets/jobs`, name `refresh-faces`) and reports
+  submission status honestly.
+- **Server stats**: `get_server_stats` used removed endpoints (`/admin/storage`,
+  `/server-info`) and hardcoded zeros. Now uses `GET /server/storage`,
+  `GET /server/statistics` and a real album count.
+- **OCR**: `get_asset_ocr` passed a nonexistent `bounding_boxes` query param, parsed the
+  response as a dict, and fabricated empty results on 404. The endpoint returns a list
+  of word boxes - now aggregated into `text`/`words`/`confidence`, and 404 raises
+  honestly instead of returning fake data.
+- **Visibility**: `update_asset_visibility` advertised invalid values (`private`,
+  `public`, `archived`). The real enum is `archive`, `timeline`, `hidden`, `locked`;
+  values are now validated before sending.
+- **Libraries**: removed dead endpoints (`refresh`, `optimize`, `locations`,
+  `empty-trash`, `clean-bundles`); `create_library` now resolves the required
+  `ownerId` via `/users/me`; `scan_library` no longer sends a nonexistent body;
+  `get_libraries` handles the plain-array response; added `get_library_statistics`.
+- **Version alignment**: `pyproject.toml` bumped from 1.5.0 to 1.6.1 (STATUS/CHANGELOG
+  already claimed 1.6.0); `mcpb/` packaging copy resynced with `src/`.
+
 ## [1.6.0] - 2026-07-12
 
 ### Added

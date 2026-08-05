@@ -1,5 +1,5 @@
 # Immich MCP — Project Status & Health Report
-**Version 1.6.0** | **July 13, 2026** | **FastMCP 3.4+ Standard**
+**Version 1.6.1** | **August 6, 2026** | **FastMCP 3.4+ Standard**
 
 ---
 
