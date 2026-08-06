@@ -461,9 +461,9 @@ python -m immich_mcp.server
 ```
 
 ###  HTTP Mode (REST API)
-**For Immich++ and other applications:**
+**For webapp and other HTTP consumers:**
 ```bash
-python run_http_server.py --transport http --port 8000
+python run_http_server.py --transport http --port 10839
 ```
 
 **Available REST endpoints:**
@@ -480,13 +480,12 @@ python run_http_server.py --transport http --port 8000
 
 ### Integration Benefits
 
-** With Immich++:**
-- **Tool Reuse**: Immich++ calls MCP tools via HTTP
-- **Automatic Fallback**: MCP proxy fails  Direct API
+**With HTTP clients (webapp, scripts):**
+- **Tool Reuse**: All MCP tools callable via REST
 - **Single Source of Truth**: Centralized Immich API logic
-- **Future-Proof**: MCP updates benefit Immich++ automatically
+- **Future-Proof**: API updates benefit all consumers
 
-** With Claude Desktop:**
+**With Claude Desktop:**
 - **Native MCP Support**: Full protocol compliance
 - **Conversational Access**: All tools via AI chat
 - **Optimized Performance**: Streamlined for AI workflows
@@ -499,14 +498,16 @@ python run_http_server.py --transport http --port 8000
 
 | Variable | Required | Description | Default |
 |----------|----------|-------------|---------|
-| `IMMICH_URL` | Yes | URL of your Immich server | `http://localhost:2283` |
+| `IMMICH_SERVER_URL` | Yes | URL of your Immich server (no `/api` suffix) | `http://localhost:2283` |
 | `IMMICH_API_KEY` | Yes | Your Immich API key | - |
-| `LOG_LEVEL` | No | Logging level (DEBUG, INFO, WARNING, ERROR) | `INFO` |
-|----------|----------|-------------|---------|
-| `IMMICH_URL` |  | Immich server URL | - |
-| `IMMICH_API_KEY` |  | API key from Immich | - |
-| `MCP_SERVER_NAME` |  | Server display name | `"Immich Photo Management MCP "` |
-| `LOG_LEVEL` |  | Logging verbosity | `INFO` |
+| `IMMICH_USERS` | No | Multi-user: comma-separated `name:key:role[:description]` | - |
+| `IMMICH_ACTIVE_USER` | No | Active user from `IMMICH_USERS` | first user |
+| `IMMICH_TIMEOUT` | No | HTTP timeout seconds | `30` |
+| `IMMICH_MAX_RETRIES` | No | HTTP retry count | `3` |
+| `IMMICH_DEFAULT_LIMIT` | No | Default search result limit | `50` |
+| `IMMICH_MAX_LIMIT` | No | Maximum search result limit | `200` |
+| `IMMICH_DEBUG` | No | Debug logging (`1`/`true`) | `0` |
+| `MCP_BRIDGE_URLS` | No | External MCP servers to proxy (comma-separated) | - |
 
 ### Advanced Configuration
 
