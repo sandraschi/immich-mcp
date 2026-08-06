@@ -751,7 +751,7 @@ To start the webapp:
 ```
 
 ### Test Readme
-Source: TEST_README.md
+Source: docs\TEST_README.md
 ```
 # Immich MCP Test Suite
 

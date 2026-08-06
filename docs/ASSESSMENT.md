@@ -23,10 +23,10 @@ A comprehensive assessment of the `immich-mcp` repository was conducted to evalu
 The codebase was scaffolded targeting **Immich v2.4.0** (released Dec 2025). As Immich heads toward **v3.0.0** in mid-2026, several breaking changes have been introduced that will break the server in production:
 
 ### ⚠️ API Change 1: Removal of `deviceAssetId` and `deviceId`
-* **Affected Files**: 
+* **Affected Files**:
   - [immich_api.py](file:///D:/Dev/repos/immich-mcp/src/immich_mcp/immich_api.py#L207)
   - [server.py](file:///D:/Dev/repos/immich-mcp/src/immich_mcp/server.py#L229)
-* **Impact**: 
+* **Impact**:
   - In `upload_photos_batch`, the client passes `deviceAssetId` and `deviceId` during multipart asset uploads (`POST /assets`). In v3.0.0, these fields are removed, causing uploads to fail or be ignored.
   - The `PhotoSearchResult` Pydantic model requires `device_asset_id` and `device_id` as non-nullable string fields. If they are removed from the Immich API response schema, Pydantic validation will raise `ValidationError`, crashing search tool responses.
 * **Fix**: Make these fields optional in the Pydantic schemas and remove them from the asset upload payload.
@@ -50,7 +50,7 @@ The codebase was scaffolded targeting **Immich v2.4.0** (released Dec 2025). As 
 Static code analysis and test execution revealed multiple critical bugs that prevent testing and integration:
 
 ### 🔴 Bug 1: Broken Test Collection (Legacy Files)
-* **Files**: 
+* **Files**:
   - [test_api.py](file:///D:/Dev/repos/immich-mcp/tests/test_api.py#L11)
   - [integration_tests.py](file:///D:/Dev/repos/immich-mcp/tests/integration_tests.py#L15)
 * **Description**: Both files import modules from a non-existent `immich` package (e.g. `from immich.album_manager import AlbumManager`). Running `pytest` fails immediately during collection, preventing any tests from running.
