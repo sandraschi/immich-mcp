@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     log_level: str = "info"
 
     # Immich API settings
-    immich_url: AnyHttpUrl = "http://localhost:2283"
-    immich_api_key: str = Field(..., validation_alias="IMMICH_API_KEY")
+    immich_url: AnyHttpUrl = AnyHttpUrl("http://localhost:2283")
+    immich_api_key: str = Field(default="", validation_alias="IMMICH_API_KEY")
     immich_timeout: int = 30
     immich_max_retries: int = 3
     immich_default_limit: int = 50
@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     # Validation
     @field_validator("immich_url", mode="before")
     @classmethod
-    def validate_immich_url(cls, v: Any) -> AnyHttpUrl:
+    def validate_immich_url(cls, v: Any) -> Any:
         """Ensure the Immich URL doesn't end with /api."""
         if isinstance(v, str):
             if v.endswith("/api"):

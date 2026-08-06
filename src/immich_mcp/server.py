@@ -190,8 +190,10 @@ from .agentic import register_agentic_tools
 register_agentic_tools()
 
 # CRITICAL: After server initialization, restore stdout for stdio mode
-if _is_stdio_mode and hasattr(sys.stdout, "restore"):
-    sys.stdout.restore()
+if _is_stdio_mode:
+    _restore_stdout = getattr(sys.stdout, "restore", None)
+    if _restore_stdout is not None:
+        _restore_stdout()
 
 # FastMCP 3.1: separate FastAPI app for custom routes; mount MCP HTTP app at /mcp
 from contextlib import asynccontextmanager
@@ -651,7 +653,7 @@ async def search_photos(
     query: str,
     search_type: str = Field("smart", description="Search type: smart, ocr, metadata, or filename"),
     limit: int = Field(50, description="Maximum results to return"),
-    ocr_language: str = Field(
+    ocr_language: str | None = Field(
         default=None,
         description=(
             "OCR language model (v2.3.0+): english, english_only, chinese_simplified, "
@@ -938,14 +940,14 @@ async def switch_immich_user(username: str) -> dict:
         Dict indicating success and the new active user.
     """
     try:
-        global config, api_client
+        global config
         if not config:
             config = get_config()
 
         user = config.switch_user(username)
-        # Ensure the global client is updated if it exists
-        if api_client:
-            api_client.switch_user(user)
+        # Sync the shared API client so subsequent calls use the new user's key
+        client = await get_api_client()
+        client.switch_user(user)
 
         return {
             "success": True,
@@ -2539,8 +2541,9 @@ async def list_users() -> dict:
         if not config:
             config = get_config()
 
+        users = config.users or {}
         users_info = []
-        for username, user in config.users.items():
+        for username, user in users.items():
             users_info.append(
                 {
                     "name": user.name,
@@ -2554,8 +2557,8 @@ async def list_users() -> dict:
             "success": True,
             "users": users_info,
             "active_user": config.active_user,
-            "total_users": len(config.users),
-            "message": f"Found {len(config.users)} configured users",
+            "total_users": len(users),
+            "message": f"Found {len(users)} configured users",
         }
     except Exception as e:
         logger.error(f"Failed to list users: {e}")
@@ -2577,7 +2580,7 @@ async def switch_user(username: str) -> dict:
     Returns:
         Confirmation of user switch with new active user information
     """
-    global config, api_client
+    global config
     try:
         if not config:
             config = get_config()
@@ -2586,8 +2589,8 @@ async def switch_user(username: str) -> dict:
         new_user = config.switch_user(username)
 
         # Update API client to use new user
-        if api_client:
-            api_client.switch_user(new_user)
+        client = await get_api_client()
+        client.switch_user(new_user)
 
         return {
             "success": True,
@@ -2616,23 +2619,19 @@ async def get_current_user() -> dict:
     Returns:
         Current user information and permissions
     """
-    global config, api_client
+    global config
     try:
         if not config:
             config = get_config()
 
         current_user = config.get_active_user()
 
-        # Get user-specific capabilities if API client is available
-        capabilities = {}
-        if api_client:
-            from contextlib import suppress
-
-            with suppress(Exception):
-                # Try to get user capabilities (this might vary by Immich version)
-                capabilities["can_create_libraries"] = current_user.role in ["admin", "owner"]
-                capabilities["can_manage_users"] = current_user.role == "admin"
-                capabilities["can_delete_content"] = current_user.role in ["admin", "user"]
+        # Role-based capabilities (no client round-trip needed)
+        capabilities = {
+            "can_create_libraries": current_user.role in ["admin", "owner"],
+            "can_manage_users": current_user.role == "admin",
+            "can_delete_content": current_user.role in ["admin", "user"],
+        }
 
         return {
             "success": True,
@@ -2661,23 +2660,25 @@ async def get_user_libraries(username: str | None = None) -> dict:
     Returns:
         List of accessible libraries for the specified user
     """
-    global config, api_client
+    global config
     try:
         if not config:
             config = get_config()
 
+        client = await get_api_client()
         target_user = username or config.active_user
         if target_user != config.active_user:
             # Temporarily switch to target user to get their libraries
             original_user = config.get_active_user()
-            target_user_obj = config.users[target_user]
-            api_client.switch_user(target_user_obj)
-            libraries = await api_client.get_libraries()
+            users = config.users or {}
+            target_user_obj = users[target_user]
+            client.switch_user(target_user_obj)
+            libraries = await client.get_libraries()
             # Switch back
-            api_client.switch_user(original_user)
+            client.switch_user(original_user)
         else:
             # Current user - just get libraries
-            libraries = await api_client.get_libraries()
+            libraries = await client.get_libraries()
 
         return {
             "success": True,
@@ -2916,23 +2917,60 @@ async def show_server_health_prefab() -> PrefabApp:
         "features": [{"name": f} for f in features],
     }
 
-    with PrefabApp(state=state, css_class="p-6 bg-slate-900 text-white rounded-lg shadow-md max-w-md") as app:
-        Heading("Immich Connection Dashboard", level=1, css_class="text-2xl font-bold mb-4 text-emerald-400")
-        with Row(gap=4, css_class="mb-2"):
-            Text("API URL:", css_class="font-semibold text-slate-300")
-            Text(client.base_url, css_class="text-slate-100")
-        with Row(gap=4, css_class="mb-2"):
-            Text("Version:", css_class="font-semibold text-slate-300")
-            Text("{{ version }}", css_class="text-emerald-300")
-        with Row(gap=4, css_class="mb-4"):
-            Text("Status:", css_class="font-semibold text-slate-300")
+    with PrefabApp(state=state) as app:
+        Heading("Immich Connection Dashboard", level=1, cssClass="text-2xl font-bold mb-4 text-emerald-400")
+        with Row(gap=4, cssClass="mb-2"):
+            Text("API URL:", cssClass="font-semibold text-slate-300")
+            Text(client.base_url, cssClass="text-slate-100")
+        with Row(gap=4, cssClass="mb-2"):
+            Text("Version:", cssClass="font-semibold text-slate-300")
+            Text("{{ version }}", cssClass="text-emerald-300")
+        with Row(gap=4, cssClass="mb-4"):
+            Text("Status:", cssClass="font-semibold text-slate-300")
             Badge("{{ status }}", color="emerald" if "healthy" in status else "rose")
 
-        Heading("Server Features", level=2, css_class="text-lg font-semibold mt-4 mb-2 text-slate-200")
+        Heading("Server Features", level=2, cssClass="text-lg font-semibold mt-4 mb-2 text-slate-200")
         with Column(gap=2), ForEach("features"):
-            Text("• {{ name }}", css_class="text-slate-300")
+            Text("• {{ name }}", cssClass="text-slate-300")
 
     return app
+
+
+@mcp.tool(annotations={"destructive": True})
+async def immich_shutdown(confirm: bool = False) -> dict:
+    """Gracefully shut down the Immich MCP server process.
+
+    Ends the stdio or HTTP server loop after responding. Use when the agent or
+    user wants to stop the server cleanly (e.g. before an upgrade or restart).
+
+    Args:
+        confirm (bool, REQUIRED): Must be True to shut down.
+
+    ## Return Format
+    {"success": bool, "message": str}
+
+    ## Examples
+    immich_shutdown(confirm=True)
+    """
+    if not confirm:
+        return {
+            "success": False,
+            "message": "Shutdown aborted - pass confirm=True to shut down the server.",
+        }
+    logger.warning("immich_shutdown invoked - stopping server")
+    client = await get_api_client()
+    await client.close()
+
+    def _exit_later() -> None:
+        import time
+
+        time.sleep(1.5)
+        os._exit(0)
+
+    import threading
+
+    threading.Thread(target=_exit_later, daemon=True).start()
+    return {"success": True, "message": "Immich MCP server is shutting down."}
 
 
 def main():

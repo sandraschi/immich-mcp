@@ -181,7 +181,7 @@ class ImmichAPIClient:
         """
         try:
             url = f"{self.base_url}/api{endpoint}"
-            response = await self.client.delete(url, json=data)
+            response = await self.client.request("DELETE", url, json=data)
             response.raise_for_status()
             if response.content:
                 return response.json()
@@ -228,7 +228,7 @@ class ImmichAPIClient:
                     mime_type, _ = mimetypes.guess_type(file_path)
                     files = {"assetData": (Path(file_path).name, f, mime_type or "application/octet-stream")}
                     stat = Path(file_path).stat()
-                    data = {
+                    data: dict[str, str | int] = {
                         "fileCreatedAt": _iso_ts(stat.st_ctime),
                         "fileModifiedAt": _iso_ts(stat.st_mtime),
                         "filename": Path(file_path).name,

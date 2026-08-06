@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "immich-mcp"
-version = "1.6.1"
+version = "1.6.2"
 description = "Industrialized FastMCP 3.1 server for Immich photo management with conversational AI, sampling, and SOTA 2026 fleet standards."
 authors = [
     {name = "Sandra Schipal", email = "sandraschipal@gmail.com"}
@@ -137,3 +137,8 @@ ignore = ["S101", "B008", "S106", "S110", "S112", "S101", "B008", "S106", "S110"
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.411",
+]

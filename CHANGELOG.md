@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-08-06
+
+### Fixed
+- **CRITICAL CORS**: `allow_origins=["*"]` and FastMCP `run_http_async()` (which drops custom middlewares) replaced with the fleet CORS standard: explicit dev/Tauri origins, unconditional Tailscale/LAN/localhost regex, direct `uvicorn.Server` on `mcp.http_app()`.
+- **Multi-user tools broken at runtime**: `switch_immich_user`, `switch_user`, `get_current_user`, `get_user_libraries` referenced an unbound `api_client` global (NameError, silently swallowed). Rewired to `get_api_client()`; switching now actually swaps the client API key.
+- **REST routes TypeError**: `delete_photos`, `share_album`, `search_by_person`, `backup_photos`, `detect_people` passed keyword-only tool parameters positionally. Now keyword args.
+- **Agentic tools crash**: unawaited `ctx.info()` and invalid `ctx.sample(prompt=...)` signature fixed.
+- **httpx 0.28 `delete(json=...)`**: switched to `client.request("DELETE", ...)`.
+- **Pyright: 36 errors -> 0** (unbound vars, optional access, Prefab `cssClass` alias, settings types, None guards).
+- **Native build pipeline**: added `run_server.py` (dual transport) + `immich-mcp-backend.spec`; fixed `native/build.ps1` `$envSrc` bug, added API_BASE check, frozen-binary smoke test, >=5 MB size gate.
+- **Webapp**: live backend status (Tauri event + exponential backoff poll + Restart) replacing hardcoded "System Online"; Ctrl+Scroll zoom; zustand LLM store; `color-scheme: dark`; data-testid coverage on all pages.
+- **MCPB**: pack now from repo root with real 3-4-100 prompts (3065/4186 words, 116 examples), schema-valid manifest, smoke-verified bundle; stale flattened `mcpb/` removed.
+
+### Added
+- `GET /api/v1/capabilities`, `GET /api/v1/diagnostics`, enriched `/api/v1/health` (version, tool_count, providers).
+- `immich_shutdown` MCP tool (confirm-guarded).
+- Session context injection: `.claude-plugin`, `.cursorrules`/`.windsurfrules`, Copilot instructions, opencode skill.
+- pyright to dev dependencies (five-gate).
+
+### Removed
+- Tracked `.bak` dross and stale `mcpb/` staging from the index.
 ## [1.6.1] - 2026-08-06
 
 ### Fixed

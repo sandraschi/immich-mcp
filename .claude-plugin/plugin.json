@@ -1,0 +1,6 @@
+{
+  "name": "immich-mcp",
+  "version": "1.6.1",
+  "description": "Immich photo library management - search, albums, faces, OCR, libraries",
+  "hooks": "../hooks/hooks.json"
+}

@@ -1,0 +1,956 @@
+[
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "dog playing in snow",
+      "search_type": "smart",
+      "limit": 20
+    },
+    "description": "Semantic search for content - default smart mode"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "sunset over mountains",
+      "search_type": "smart",
+      "limit": 50
+    },
+    "description": "Semantic search with default limit"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "receipt electronics store",
+      "search_type": "ocr",
+      "limit": 20
+    },
+    "description": "OCR search for text inside images"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "invoice",
+      "search_type": "ocr",
+      "limit": 100
+    },
+    "description": "Large OCR search - receipts and invoices"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "Nikon D850",
+      "search_type": "metadata",
+      "limit": 50
+    },
+    "description": "Metadata search by camera body"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "ISO 800",
+      "search_type": "metadata",
+      "limit": 50
+    },
+    "description": "Metadata search by ISO"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "IMG_20260301",
+      "search_type": "filename",
+      "limit": 20
+    },
+    "description": "Filename pattern search"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "Berlin",
+      "search_type": "smart",
+      "limit": 10
+    },
+    "description": "Quick discovery - small page to save tokens"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "wedding cake",
+      "search_type": "smart",
+      "limit": 200
+    },
+    "description": "Exhaustive sweep capped at max limit"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "japanese receipt",
+      "search_type": "ocr",
+      "ocr_language": "japanese",
+      "limit": 20
+    },
+    "description": "OCR search with language model hint"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "grandma garden",
+      "search_type": "smart",
+      "limit": 50
+    },
+    "description": "Smart search for a person-scene combo"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "car rental",
+      "search_type": "ocr",
+      "limit": 30
+    },
+    "description": "OCR search - travel receipts"
+  },
+  {
+    "tool": "get_photo_info",
+    "params": {
+      "asset_id": "550e8400-e29b-41d4-a716-446655440000"
+    },
+    "description": "Full EXIF and metadata dossier for one asset"
+  },
+  {
+    "tool": "get_photo_info",
+    "params": {
+      "asset_id": "abc123def456"
+    },
+    "description": "Minimal-form asset id"
+  },
+  {
+    "tool": "get_photo_info",
+    "params": {
+      "asset_id": "video-001"
+    },
+    "description": "Video asset metadata"
+  },
+  {
+    "tool": "get_ocr_data",
+    "params": {
+      "asset_id": "550e8400-e29b-41d4-a716-446655440000"
+    },
+    "description": "OCR text with word bounding boxes"
+  },
+  {
+    "tool": "get_ocr_data",
+    "params": {
+      "asset_id": "receipt-2026-01"
+    },
+    "description": "Read a receipt's text"
+  },
+  {
+    "tool": "get_asset_ocr",
+    "params": {
+      "asset_id": "550e8400-e29b-41d4-a716-446655440000"
+    },
+    "description": "Aggregated OCR view (text, words, confidence)"
+  },
+  {
+    "tool": "download_photo_to_temp",
+    "params": {
+      "photo_id": "550e8400-e29b-41d4-a716-446655440000"
+    },
+    "description": "Download original to temp for local use"
+  },
+  {
+    "tool": "download_photo_to_temp",
+    "params": {
+      "photo_id": "video-002"
+    },
+    "description": "Download a video original"
+  },
+  {
+    "tool": "get_photo_info",
+    "params": {
+      "asset_id": "550e8400-e29b-41d4-a716-446655440000"
+    },
+    "description": "Check GPS coordinates of a photo"
+  },
+  {
+    "tool": "upload_photos",
+    "params": {
+      "file_paths": [
+        "D:/Camera Dump/img_001.jpg",
+        "D:/Camera Dump/img_002.jpg"
+      ]
+    },
+    "description": "Batch upload with defaults"
+  },
+  {
+    "tool": "upload_photos",
+    "params": {
+      "file_paths": [
+        "D:/Camera Dump/img_003.jpg"
+      ],
+      "album_name": "Camera Dump 2026"
+    },
+    "description": "Upload directly into an album"
+  },
+  {
+    "tool": "upload_photos",
+    "params": {
+      "file_paths": [
+        "D:/Camera Dump/img_004.jpg"
+      ],
+      "auto_organize": true
+    },
+    "description": "Upload with auto date-organization"
+  },
+  {
+    "tool": "upload_photos",
+    "params": {
+      "file_paths": [
+        "D:/Camera Dump/missing.jpg",
+        "D:/Camera Dump/img_005.jpg"
+      ]
+    },
+    "description": "Upload with one missing file - reported, not fatal"
+  },
+  {
+    "tool": "organize_photos_by_date",
+    "params": {
+      "asset_ids": [
+        "a1",
+        "a2",
+        "a3"
+      ],
+      "album_name": "Prague 2026"
+    },
+    "description": "Group photos into a date-based album"
+  },
+  {
+    "tool": "organize_photos_by_date",
+    "params": {
+      "asset_ids": [
+        "b1",
+        "b2"
+      ]
+    },
+    "description": "Date-organize without a base name"
+  },
+  {
+    "tool": "update_asset_visibility",
+    "params": {
+      "asset_id": "a1",
+      "visibility": "archive"
+    },
+    "description": "Archive out of the timeline"
+  },
+  {
+    "tool": "update_asset_visibility",
+    "params": {
+      "asset_id": "a2",
+      "visibility": "hidden"
+    },
+    "description": "Hide from search and timeline"
+  },
+  {
+    "tool": "update_asset_visibility",
+    "params": {
+      "asset_id": "a3",
+      "visibility": "locked"
+    },
+    "description": "Lock against edits"
+  },
+  {
+    "tool": "edit_photo",
+    "params": {
+      "asset_id": "a4",
+      "operation": "rotate",
+      "parameters": {
+        "angle": 90
+      }
+    },
+    "description": "Rotate a portrait 90 degrees"
+  },
+  {
+    "tool": "delete_photos",
+    "params": {
+      "asset_ids": [
+        "a1",
+        "a2"
+      ],
+      "move_to_trash": true
+    },
+    "description": "Move to trash - safe default"
+  },
+  {
+    "tool": "delete_photos",
+    "params": {
+      "asset_ids": [
+        "a3"
+      ],
+      "move_to_trash": false
+    },
+    "description": "Permanent delete - requires explicit user confirmation"
+  },
+  {
+    "tool": "delete_photos",
+    "params": {
+      "asset_ids": [
+        "b1",
+        "b2",
+        "b3"
+      ],
+      "move_to_trash": true
+    },
+    "description": "Batch trash of duplicates"
+  },
+  {
+    "tool": "delete_photos",
+    "params": {
+      "asset_ids": [
+        "c1"
+      ]
+    },
+    "description": "Trash one asset (default True)"
+  },
+  {
+    "tool": "delete_photos",
+    "params": {
+      "asset_ids": [
+        "d1",
+        "d2",
+        "d3",
+        "d4",
+        "d5"
+      ]
+    },
+    "description": "Trash a group of five"
+  },
+  {
+    "tool": "list_albums",
+    "params": {
+      "include_stats": true
+    },
+    "description": "List albums with counts and sizes"
+  },
+  {
+    "tool": "list_albums",
+    "params": {
+      "shared": true
+    },
+    "description": "List only shared albums"
+  },
+  {
+    "tool": "list_albums",
+    "params": {
+      "shared": false,
+      "include_stats": false
+    },
+    "description": "Own albums, no stats"
+  },
+  {
+    "tool": "create_album",
+    "params": {
+      "name": "Prague 2026"
+    },
+    "description": "Create an empty album"
+  },
+  {
+    "tool": "create_album",
+    "params": {
+      "name": "Prague 2026",
+      "description": "Trip photos",
+      "asset_ids": [
+        "a1",
+        "a2"
+      ]
+    },
+    "description": "Create album with assets"
+  },
+  {
+    "tool": "create_album",
+    "params": {
+      "name": "2025 Receipts",
+      "description": "Tax season"
+    },
+    "description": "Tax album"
+  },
+  {
+    "tool": "add_to_album",
+    "params": {
+      "album_id": "alb-1",
+      "asset_ids": [
+        "a1",
+        "a2",
+        "a3"
+      ]
+    },
+    "description": "Add photos to an album"
+  },
+  {
+    "tool": "add_to_album",
+    "params": {
+      "album_id": "alb-2",
+      "asset_ids": [
+        "b1"
+      ]
+    },
+    "description": "Add a single photo"
+  },
+  {
+    "tool": "share_album",
+    "params": {
+      "album_id": "alb-1",
+      "allow_download": true
+    },
+    "description": "Share with download enabled"
+  },
+  {
+    "tool": "share_album",
+    "params": {
+      "album_id": "alb-1",
+      "expires_at": "2026-12-31T23:59:59",
+      "allow_download": true
+    },
+    "description": "Share with expiry and downloads"
+  },
+  {
+    "tool": "share_album",
+    "params": {
+      "album_id": "alb-3",
+      "allow_upload": true,
+      "show_metadata": false
+    },
+    "description": "Event share - guests upload, no EXIF"
+  },
+  {
+    "tool": "share_album",
+    "params": {
+      "album_id": "alb-4"
+    },
+    "description": "Default share (downloads on, uploads off)"
+  },
+  {
+    "tool": "detect_people",
+    "params": {
+      "asset_ids": [
+        "a1",
+        "a2",
+        "a3"
+      ]
+    },
+    "description": "Queue face detection for assets"
+  },
+  {
+    "tool": "detect_people",
+    "params": {
+      "force_reprocess": true
+    },
+    "description": "Re-run detection on everything"
+  },
+  {
+    "tool": "detect_people",
+    "params": {},
+    "description": "Queue detection for all assets"
+  },
+  {
+    "tool": "tag_person",
+    "params": {
+      "person_id": "p1",
+      "name": "Grandma"
+    },
+    "description": "Name a detected person"
+  },
+  {
+    "tool": "tag_person",
+    "params": {
+      "person_id": "p2",
+      "name": "Benny",
+      "face_asset_ids": [
+        "f1",
+        "f2"
+      ]
+    },
+    "description": "Name a person restricting face samples"
+  },
+  {
+    "tool": "search_by_person",
+    "params": {
+      "person_name": "Grandma",
+      "limit": 100
+    },
+    "description": "All photos of a named person"
+  },
+  {
+    "tool": "search_by_person",
+    "params": {
+      "person_name": "Benny"
+    },
+    "description": "Default-limit person search"
+  },
+  {
+    "tool": "search_by_person",
+    "params": {
+      "person_name": "Grandma",
+      "include_metadata": false
+    },
+    "description": "Person search without metadata payload"
+  },
+  {
+    "tool": "detect_people",
+    "params": {
+      "asset_ids": [
+        "v1",
+        "v2"
+      ],
+      "force_reprocess": false
+    },
+    "description": "Detection on videos too"
+  },
+  {
+    "tool": "list_libraries",
+    "params": {},
+    "description": "List all libraries"
+  },
+  {
+    "tool": "get_library_info",
+    "params": {
+      "library_id": "lib-1"
+    },
+    "description": "One library's details"
+  },
+  {
+    "tool": "create_library",
+    "params": {
+      "name": "Archive Disk",
+      "import_paths": [
+        "/mnt/archive/photos"
+      ]
+    },
+    "description": "Create a library for the current user"
+  },
+  {
+    "tool": "create_library",
+    "params": {
+      "name": "Steve's Folder",
+      "import_paths": [
+        "/mnt/steve"
+      ],
+      "owner": "steve"
+    },
+    "description": "Create a library owned by another user"
+  },
+  {
+    "tool": "scan_library",
+    "params": {
+      "library_id": "lib-1"
+    },
+    "description": "Trigger an import scan"
+  },
+  {
+    "tool": "scan_library",
+    "params": {
+      "library_id": "lib-2"
+    },
+    "description": "Rescan an updated library"
+  },
+  {
+    "tool": "manage_library",
+    "params": {
+      "library_id": "lib-1",
+      "operation": "pause"
+    },
+    "description": "Pause library processing"
+  },
+  {
+    "tool": "manage_library",
+    "params": {
+      "library_id": "lib-1",
+      "operation": "resume"
+    },
+    "description": "Resume library processing"
+  },
+  {
+    "tool": "get_user_libraries",
+    "params": {
+      "username": "steve"
+    },
+    "description": "Libraries visible to Steve"
+  },
+  {
+    "tool": "get_user_libraries",
+    "params": {},
+    "description": "Libraries for the current user"
+  },
+  {
+    "tool": "create_library",
+    "params": {
+      "name": "Scans",
+      "import_paths": [
+        "/mnt/scans/2026"
+      ]
+    },
+    "description": "Scan-inbox library"
+  },
+  {
+    "tool": "list_users",
+    "params": {},
+    "description": "List configured users"
+  },
+  {
+    "tool": "switch_user",
+    "params": {
+      "username": "steve"
+    },
+    "description": "Act as Steve"
+  },
+  {
+    "tool": "switch_user",
+    "params": {
+      "username": "sandra"
+    },
+    "description": "Switch back to Sandra"
+  },
+  {
+    "tool": "switch_immich_user",
+    "params": {
+      "username": "steve"
+    },
+    "description": "Alias switch - update client headers"
+  },
+  {
+    "tool": "get_current_user",
+    "params": {},
+    "description": "Active identity and capabilities"
+  },
+  {
+    "tool": "get_user_libraries",
+    "params": {
+      "username": "steve"
+    },
+    "description": "Steve's accessible libraries"
+  },
+  {
+    "tool": "list_users",
+    "params": {},
+    "description": "Verify active user after switching"
+  },
+  {
+    "tool": "switch_user",
+    "params": {
+      "username": "shared-account"
+    },
+    "description": "Switch to a shared account"
+  },
+  {
+    "tool": "get_current_user",
+    "params": {},
+    "description": "Confirm role before destructive ops"
+  },
+  {
+    "tool": "get_storage_info",
+    "params": {},
+    "description": "Library storage totals"
+  },
+  {
+    "tool": "get_storage_info",
+    "params": {},
+    "description": "Check before planning a backup"
+  },
+  {
+    "tool": "backup_photos",
+    "params": {
+      "backup_path": "D:/Backups/Immich",
+      "album_ids": [
+        "alb-1"
+      ]
+    },
+    "description": "Back up one album"
+  },
+  {
+    "tool": "backup_photos",
+    "params": {
+      "backup_path": "D:/Backups/Immich",
+      "album_ids": [
+        "alb-1",
+        "alb-2"
+      ],
+      "include_metadata": true
+    },
+    "description": "Back up albums with metadata"
+  },
+  {
+    "tool": "backup_photos",
+    "params": {
+      "backup_path": "F:/ImmichArchive"
+    },
+    "description": "Back up everything"
+  },
+  {
+    "tool": "sync_metadata_to_exif",
+    "params": {
+      "photo_id": "a1",
+      "local_path": "D:/Backups/img_001.jpg"
+    },
+    "description": "Write metadata back into a local file"
+  },
+  {
+    "tool": "sync_metadata_to_exif",
+    "params": {
+      "photo_id": "v1",
+      "local_path": "D:/Backups/vid_001.mp4"
+    },
+    "description": "EXIF sync on a video sidecar"
+  },
+  {
+    "tool": "detect_similar_photos",
+    "params": {},
+    "description": "Queue the similarity job"
+  },
+  {
+    "tool": "backup_photos",
+    "params": {
+      "backup_path": "E:/Tax2025",
+      "album_ids": [
+        "alb-tax"
+      ]
+    },
+    "description": "Tax backup"
+  },
+  {
+    "tool": "get_storage_info",
+    "params": {},
+    "description": "Storage after uploads"
+  },
+  {
+    "tool": "server_health",
+    "params": {},
+    "description": "Liveness probe - version, DB, Redis, uptime"
+  },
+  {
+    "tool": "server_health",
+    "params": {},
+    "description": "Diagnose connection errors"
+  },
+  {
+    "tool": "show_server_health_prefab",
+    "params": {},
+    "description": "Health as a Prefab card"
+  },
+  {
+    "tool": "immich_help",
+    "params": {
+      "category": "photos"
+    },
+    "description": "Help for photo tools"
+  },
+  {
+    "tool": "immich_help",
+    "params": {
+      "category": "albums"
+    },
+    "description": "Help for album tools"
+  },
+  {
+    "tool": "immich_help",
+    "params": {
+      "category": "system"
+    },
+    "description": "Help for system tools"
+  },
+  {
+    "tool": "immich_help",
+    "params": {
+      "category": "agentic"
+    },
+    "description": "Help for agentic tools"
+  },
+  {
+    "tool": "immich_help",
+    "params": {},
+    "description": "Help index"
+  },
+  {
+    "tool": "immich_shutdown",
+    "params": {
+      "confirm": true
+    },
+    "description": "Graceful server shutdown"
+  },
+  {
+    "tool": "immich_shutdown",
+    "params": {
+      "confirm": false
+    },
+    "description": "Aborted shutdown (safe)"
+  },
+  {
+    "tool": "agentic_immich_workflow",
+    "params": {
+      "workflow_prompt": "Organize all 2025 photos into monthly albums"
+    },
+    "description": "Autonomous multi-step organization"
+  },
+  {
+    "tool": "intelligent_photo_processing",
+    "params": {
+      "photos": [
+        {
+          "id": "a1",
+          "type": "IMAGE"
+        },
+        {
+          "id": "a2",
+          "type": "IMAGE"
+        }
+      ],
+      "processing_goal": "Find the keepers",
+      "available_operations": [
+        "keep",
+        "trash"
+      ]
+    },
+    "description": "Batch decision over a photo set"
+  },
+  {
+    "tool": "conversational_immich_assistant",
+    "params": {
+      "user_query": "What is the best way to organize a year of photos?"
+    },
+    "description": "Planning-oriented chat answer"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "Prague",
+      "search_type": "smart",
+      "limit": 60
+    },
+    "description": "Step 1 of trip album: gather"
+  },
+  {
+    "tool": "create_album",
+    "params": {
+      "name": "Prague 2026",
+      "description": "Trip"
+    },
+    "description": "Step 2: album"
+  },
+  {
+    "tool": "add_to_album",
+    "params": {
+      "album_id": "alb-1",
+      "asset_ids": [
+        "a1",
+        "a2"
+      ]
+    },
+    "description": "Step 3: populate"
+  },
+  {
+    "tool": "share_album",
+    "params": {
+      "album_id": "alb-1",
+      "expires_at": "2026-12-31T23:59:59"
+    },
+    "description": "Step 4: share with expiry"
+  },
+  {
+    "tool": "backup_photos",
+    "params": {
+      "backup_path": "D:/Backups",
+      "album_ids": [
+        "alb-1"
+      ]
+    },
+    "description": "Step 5: local backup"
+  },
+  {
+    "tool": "search_photos",
+    "params": {
+      "query": "receipt",
+      "search_type": "ocr",
+      "limit": 100
+    },
+    "description": "Tax hunt step 1: OCR gather"
+  },
+  {
+    "tool": "create_album",
+    "params": {
+      "name": "2025 Receipts"
+    },
+    "description": "Tax hunt step 2: album"
+  },
+  {
+    "tool": "add_to_album",
+    "params": {
+      "album_id": "alb-tax",
+      "asset_ids": [
+        "r1",
+        "r2",
+        "r3"
+      ]
+    },
+    "description": "Tax hunt step 3: populate"
+  },
+  {
+    "tool": "detect_people",
+    "params": {
+      "asset_ids": [
+        "a1",
+        "a2",
+        "a3"
+      ]
+    },
+    "description": "Face pipeline step 1"
+  },
+  {
+    "tool": "tag_person",
+    "params": {
+      "person_id": "p1",
+      "name": "Grandma"
+    },
+    "description": "Face pipeline step 2"
+  },
+  {
+    "tool": "search_by_person",
+    "params": {
+      "person_name": "Grandma",
+      "limit": 100
+    },
+    "description": "Face pipeline step 3: verify"
+  },
+  {
+    "tool": "upload_photos",
+    "params": {
+      "file_paths": [
+        "D:/Dump/img_001.jpg",
+        "D:/Dump/img_002.jpg"
+      ]
+    },
+    "description": "Cleanup step 1: ingest dump"
+  },
+  {
+    "tool": "detect_similar_photos",
+    "params": {},
+    "description": "Cleanup step 2: find duplicates"
+  },
+  {
+    "tool": "delete_photos",
+    "params": {
+      "asset_ids": [
+        "dup1",
+        "dup2"
+      ],
+      "move_to_trash": true
+    },
+    "description": "Cleanup step 3: trash dupes"
+  },
+  {
+    "tool": "get_storage_info",
+    "params": {},
+    "description": "Audit step 1: size the library"
+  },
+  {
+    "tool": "list_users",
+    "params": {},
+    "description": "Audit step 2: who has access"
+  }
+]

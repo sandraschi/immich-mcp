@@ -211,19 +211,32 @@ async def run_server_async(mcp_app, args: argparse.Namespace | None = None, serv
             await mcp_app.run_stdio_async()
 
         elif transport == "http":
+            import uvicorn
+            from fastapi.middleware.cors import CORSMiddleware
+
             host = config["host"]
             port = config["port"]
             path = config["path"]
             endpoint = f"http://{host}:{port}{path}"
             logger.info(f"Running in HTTP Streamable mode: {endpoint}")
 
-            # Inject CORS and Health for Antigravity discovery
-            app = mcp_app.http_app()
-            from fastapi.middleware.cors import CORSMiddleware
-
+            # Fleet CORS standard (mcp-central-docs/standards/CORS_STANDARD.md).
+            # Unconditional: covers dev browsers, Tauri WebView, Tailscale, LAN.
+            app = mcp_app.http_app(path=path)
             app.add_middleware(
                 CORSMiddleware,
-                allow_origins=["*"],
+                allow_origins=[
+                    f"http://localhost:{port}",
+                    f"http://127.0.0.1:{port}",
+                    "tauri://localhost",
+                    "http://tauri.localhost",
+                    "https://tauri.localhost",
+                ],
+                allow_origin_regex=(
+                    r"https?://(?:[a-zA-Z0-9-]+\.ts\.net|.*?\.tail-[a-f0-9]+\.ts\.net|"
+                    r"tauri\.localhost|localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|"
+                    r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|100\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d+)?$|^tauri://localhost$"
+                ),
                 allow_credentials=True,
                 allow_methods=["*"],
                 allow_headers=["*"],
@@ -233,7 +246,11 @@ async def run_server_async(mcp_app, args: argparse.Namespace | None = None, serv
             async def health():
                 return {"status": "ok", "server": server_name}
 
-            await mcp_app.run_http_async(host=host, port=port, path=path)
+            # Run Uvicorn directly on the configured ASGI app — FastMCP's
+            # run_http_async() spawns its own internal app and drops custom
+            # middlewares (CORS would silently vanish).
+            server = uvicorn.Server(uvicorn.Config(app, host=host, port=port, log_level="info"))
+            await server.serve()
 
         elif transport == "sse":
             host = config["host"]

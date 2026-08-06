@@ -40,7 +40,11 @@ def test_health_endpoint(test_client):
     """Test the health check endpoint."""
     response = test_client.get("/api/v1/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": "1.0.0"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["server"] == "immich-mcp"
+    assert isinstance(body["version"], str)
+    assert isinstance(body["tool_count"], int)
 
 
 @pytest.mark.asyncio

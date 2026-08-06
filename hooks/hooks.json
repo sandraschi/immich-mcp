@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "text",
+            "text": "## Session Context (Immich MCP)\n\nYou have access to the user's Immich photo library: semantic CLIP search, OCR text-in-image search, albums, people/faces, libraries, upload and backup tools.\n\n**Before starting work:**\n1. Check library state: search_photos(query=\"<task topic>\", limit=10) or list_albums(include_stats=true)\n2. Check server status when relevant: server_health() or get_storage_info()\n\n**At end of work, save changes:**\n- Create/tag albums for organized results: create_album(name=\"...\"), add_to_album(album_id=\"...\", asset_ids=[...])\n- Tag people for future search: tag_person(person_id=\"...\", name=\"...\")\n- Use immich_help(category=\"...\") for tool guidance when unsure"
+          }
+        ]
+      }
+    ]
+  }
+}

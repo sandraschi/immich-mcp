@@ -35,7 +35,7 @@ export function Tools() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="tools-page">
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white mb-2">MCP Tools</h1>

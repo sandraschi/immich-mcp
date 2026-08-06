@@ -38,7 +38,7 @@ export function Logger() {
   }, [logs]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="logger-page">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white mb-2">System Logs</h2>

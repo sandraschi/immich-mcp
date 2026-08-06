@@ -100,8 +100,19 @@ async def chat_with_immich(request: ChatRequest):
 
 @router.get("/health")
 async def health_check():
-    """Health check for FastMCP 3.1 / webapp."""
-    return {"status": "ok", "version": "1.0.0"}
+    """Health check for FastMCP 3.1 / webapp (dashboard KPIs + start.ps1 readiness)."""
+    from ... import __version__
+    from ...server import mcp
+
+    tools = await mcp.list_tools()
+    return {
+        "status": "ok",
+        "server": "immich-mcp",
+        "version": __version__,
+        "tool_count": len(tools),
+        "uptime_seconds": 0,
+        "providers": {"immich_configured": bool(os.getenv("IMMICH_API_KEY") or os.getenv("IMMICH_USERS"))},
+    }
 
 
 # ===== USER MANAGEMENT ENDPOINTS =====
@@ -116,7 +127,9 @@ async def get_users():
         if not config:
             return {"users": [], "active_user": None}
 
-        users_list = [{"name": k, "role": v.role, "description": v.description} for k, v in config.users.items()]
+        users_list = [
+            {"name": k, "role": v.role, "description": v.description} for k, v in (config.users or {}).items()
+        ]
         return {"users": users_list, "active_user": config.active_user}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -150,7 +163,10 @@ async def get_person_thumbnail(person_id: str):
     try:
         from ...server import mcp
 
-        content = await mcp.immich_client.get_binary(f"/person/{person_id}/thumbnail")
+        client = mcp.immich_client
+        if client is None:
+            raise HTTPException(status_code=503, detail="Immich client not initialized")
+        content = await client.get_binary(f"/person/{person_id}/thumbnail")
         return Response(content=content, media_type="image/webp")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -162,7 +178,10 @@ async def get_photo_thumbnail(asset_id: str):
     try:
         from ...server import mcp
 
-        content = await mcp.immich_client.get_asset_thumbnail(asset_id)
+        client = mcp.immich_client
+        if client is None:
+            raise HTTPException(status_code=503, detail="Immich client not initialized")
+        content = await client.get_asset_thumbnail(asset_id)
         return Response(content=content, media_type="image/webp")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -361,7 +380,7 @@ async def delete_photos(
     try:
         from ...server import delete_photos as delete_tool
 
-        return await delete_tool(asset_ids, move_to_trash)
+        return await delete_tool(asset_ids, move_to_trash=move_to_trash)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -436,7 +455,9 @@ async def share_album(
     try:
         from ...server import share_album as share_tool
 
-        return await share_tool(album_id, expires_at, allow_download, allow_upload, show_metadata)
+        return await share_tool(
+            album_id, expires_at, allow_download=allow_download, allow_upload=allow_upload, show_metadata=show_metadata
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -455,7 +476,7 @@ async def detect_people(
     try:
         from ...server import detect_people as detect_tool
 
-        return await detect_tool(asset_ids, force_reprocess)
+        return await detect_tool(asset_ids, force_reprocess=force_reprocess)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -488,7 +509,7 @@ async def search_by_person(
     try:
         from ...server import search_by_person as search_tool
 
-        return await search_tool(person_name, limit, include_metadata)
+        return await search_tool(person_name, limit, include_metadata=include_metadata)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -547,7 +568,7 @@ async def backup_photos(
     try:
         from ...server import backup_photos as backup_tool
 
-        return await backup_tool(backup_path, album_ids, include_metadata)
+        return await backup_tool(backup_path, album_ids, include_metadata=include_metadata)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -840,3 +861,44 @@ async def library_statistics(library_id: str, client: ImmichAPIClient = Depends(
         raise _immich_error_to_http(e) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/capabilities")
+async def capabilities():
+    """Feature capabilities consumed by the webapp for dynamic UI (fleet standard)."""
+    from ... import __version__
+
+    return {
+        "server": "immich-mcp",
+        "version": __version__,
+        "features": {
+            "chat": True,
+            "llm_providers": True,
+            "skills": False,
+            "fleet_apps": False,
+            "onboarding_required": True,
+        },
+    }
+
+
+@router.get("/diagnostics")
+async def diagnostics():
+    """Full diagnostics for CUA-NSIS smoke testing: tools, system info, errors."""
+    import platform
+
+    from ...server import mcp
+
+    tool_names = sorted([t.name for t in await mcp.list_tools()])
+    return {
+        "status": "ok",
+        "server": "immich-mcp",
+        "version": "1.6.1",
+        "tool_count": len(tool_names),
+        "tools": [{"name": t} for t in tool_names],
+        "system": {
+            "platform": platform.system(),
+            "python": platform.python_version(),
+            "immich_configured": bool(os.getenv("IMMICH_API_KEY") or os.getenv("IMMICH_USERS")),
+        },
+        "errors": [],
+    }

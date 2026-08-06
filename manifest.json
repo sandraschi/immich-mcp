@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.2",
   "name": "immich-mcp",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "Austrian efficiency for Immich photo management with FastMCP 2.11+. 25+ tools including library management (external folders), multi-user support, and v2.4.0+ compatibility. Search photos with AI, OCR in 12+ languages.",
   "author": {
     "name": "sandraschi",
@@ -18,8 +18,8 @@
     "type": "python",
     "entry_point": "src/immich_mcp/server.py",
     "mcp_config": {
-      "command": "python",
-      "args": ["src/immich_mcp/server.py"],
+      "command": "uv",
+      "args": ["run", "--directory", "${PWD}", "python", "-m", "immich_mcp"],
       "env": {
         "PYTHONPATH": "${PWD}/src",
         "PYTHONUNBUFFERED": "1"
@@ -138,43 +138,38 @@
       "title": "Immich Server URL",
       "description": "The base URL of your Immich server (e.g., http://localhost:2283 or https://immich.example.com)",
       "required": true,
-      "default": "http://localhost:2283",
-      "env_var": "IMMICH_SERVER_URL"
+      "default": "http://localhost:2283"
     },
     "immich_api_key": {
       "type": "string",
       "title": "Immich API Key (Legacy)",
       "description": "Single-user API key for backward compatibility. For multi-user setup, use IMMICH_USERS instead.",
       "required": false,
-      "sensitive": true,
-      "env_var": "IMMICH_API_KEY"
+      "sensitive": true
     },
     "immich_users": {
       "type": "string",
       "title": "Multi-User Configuration",
       "description": "Multi-user setup: 'user1:key1:role1,user2:key2:role2'. Example: 'admin:abc123:admin,family:def456:user'",
       "required": false,
-      "sensitive": true,
-      "env_var": "IMMICH_USERS"
+      "sensitive": true
     },
     "immich_active_user": {
       "type": "string",
       "title": "Active User",
       "description": "Which user to use by default (must match a user in IMMICH_USERS)",
       "required": false,
-      "default": "",
-      "env_var": "IMMICH_ACTIVE_USER"
+      "default": ""
     },
     "log_level": {
       "type": "string",
       "title": "Logging Level",
       "description": "Logging verbosity level (debug, info, warning, error, critical)",
-      "default": "info",
-      "env_var": "LOG_LEVEL"
+      "default": "info"
     }
   },
   "compatibility": {
     "platforms": ["win32", "darwin", "linux"],
-    "python": ">=3.11"
+    "runtimes": { "python": ">=3.11" }
   }
 }

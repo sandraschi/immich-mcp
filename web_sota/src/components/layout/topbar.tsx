@@ -1,10 +1,22 @@
 "use client";
 
 import { APPS_CATALOG } from "@/common/apps-catalog";
+import { useBackendStatus } from "@/common/backend-status";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ExternalLink, HelpCircle, LayoutGrid } from "lucide-react";
+import { ExternalLink, HelpCircle, LayoutGrid, RefreshCw } from "lucide-react";
 
 export function Topbar() {
+  const { state, health, restarting, restartBackend } = useBackendStatus();
+
+  const dotColor =
+    state === "online" ? "bg-emerald-500" : state === "connecting" ? "bg-amber-500" : "bg-red-500";
+  const label =
+    state === "online"
+      ? `System Online${health?.version ? ` v${health.version}` : ""}`
+      : state === "connecting"
+        ? "Connecting..."
+        : "Backend Offline";
+
   return (
     <header className="flex h-14 items-center justify-between border-b border-slate-800 bg-slate-950/50 px-6 backdrop-blur-xl">
       <div className="flex items-center gap-4">
@@ -14,13 +26,30 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* System Status Indicator */}
-        <div className="mr-4 flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs text-emerald-500 border border-emerald-500/20">
+        {/* Live Backend Status Indicator */}
+        <div
+          data-testid="backend-dot"
+          className="mr-2 flex items-center gap-2 rounded-full bg-slate-800/50 px-3 py-1 text-xs text-slate-300 border border-slate-700/50"
+        >
           <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            {state === "connecting" && (
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+            )}
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${dotColor}`} />
           </span>
-          System Online
+          {label}
+          {state === "offline" && (
+            <button
+              data-testid="restart-backend"
+              onClick={() => void restartBackend()}
+              disabled={restarting}
+              title="Restart backend"
+              className="ml-1 inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-[11px] text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3 w-3 ${restarting ? "animate-spin" : ""}`} />
+              Restart
+            </button>
+          )}
         </div>
 
         {/* Global Apps Navigation */}

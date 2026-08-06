@@ -90,7 +90,7 @@ export function Photos() {
   }, [photos]);
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-20" data-testid="photos-page">
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Photos</h1>

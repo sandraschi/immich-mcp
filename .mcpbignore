@@ -23,3 +23,28 @@ build/
 native/
 web_sota/
 scripts/
+
+# Hygiene (fleet MCPB_PACKAGING_STANDARDS)
+*.bak
+*.bak.*
+__pycache__/
+*.pyc
+test_photos/
+docs-private/
+reports/
+mcpb/
+_llm_test_scripts/
+comprehensive_demo.py
+create_test_images.py
+run_all_tests.py
+run_tests.ps1
+run_http_server.py
+requirements-dev.txt
+fleet-start.config.ps1
+examples/
+.snapshots/
+.coverage
+
+# IDE rules dirs (never bundle)
+.windsurf/
+.cursor/

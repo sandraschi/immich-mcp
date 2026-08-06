@@ -63,7 +63,7 @@ export function Map() {
   const totalAssets = features?.length || 0;
 
   return (
-    <div className="min-h-[70vh] flex flex-col gap-6 pb-20">
+    <div className="min-h-[70vh] flex flex-col gap-6 pb-20" data-testid="map-page">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white mb-2 flex items-center gap-3">

@@ -160,3 +160,10 @@ docs-private/
 target/
 
 _dashboard/
+
+# Fleet assfix/audit reports
+reports/
+
+# MCPB pack staging (legacy layout - pack from repo root now)
+mcpb/
+*.mcpb

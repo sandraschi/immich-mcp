@@ -11,7 +11,7 @@ from .immich_api import ImmichAPIClient, ImmichAPIError
 from .server import ImmichMCP, mcp
 from .settings import Settings, get_settings
 
-__version__ = "1.5.0"
+__version__ = "1.6.2"
 
 __all__: list[str] = [
     "ImmichAPIClient",

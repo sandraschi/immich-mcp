@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { API_BASE } from "@/lib/api";
+import { useLlmStore } from "@/store/llm";
 import { useEffect, useState } from "react";
 
 interface ImmichUser {
@@ -130,10 +131,12 @@ interface LlmProvider {
 function LLMSettings() {
   const [providers, setProviders] = useState<LlmProvider[]>([]);
   const [models, setModels] = useState<string[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState("ollama");
-  const [selectedModel, setSelectedModel] = useState("");
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [loadingModels, setLoadingModels] = useState(false);
+  const selectedProvider = useLlmStore((s) => s.selectedProvider);
+  const selectedModel = useLlmStore((s) => s.selectedModel);
+  const setProvider = useLlmStore((s) => s.setProvider);
+  const setModel = useLlmStore((s) => s.setModel);
 
   const fetchModels = (providerId: string) => {
     setLoadingModels(true);
@@ -143,8 +146,8 @@ function LLMSettings() {
       .then((d) => {
         if (d.success && Array.isArray(d.models)) {
           setModels(d.models);
-          const savedM = localStorage.getItem("llm_model") || "";
-          setSelectedModel(savedM && d.models.includes(savedM) ? savedM : (d.models[0] ?? ""));
+          const savedM = useLlmStore.getState().selectedModel;
+          setModel(savedM && d.models.includes(savedM) ? savedM : (d.models[0] ?? ""));
         } else {
           setModels([]);
           setModelsError(d.error || "Could not load models");
@@ -163,29 +166,29 @@ function LLMSettings() {
       .then((d) => {
         const list: LlmProvider[] = Array.isArray(d.providers) ? d.providers : [];
         setProviders(list);
-        const savedP = localStorage.getItem("llm_provider");
+        const savedP = useLlmStore.getState().selectedProvider;
         const firstId = list[0]?.id ?? "ollama";
         const providerId = savedP && list.some((p) => p.id === savedP) ? savedP : firstId;
-        setSelectedProvider(providerId);
+        setProvider(providerId);
         fetchModels(providerId);
       })
       .catch(() => setModelsError("Could not reach the backend"));
   }, []);
 
   const save = (p: string, m: string) => {
-    localStorage.setItem("llm_provider", p);
-    localStorage.setItem("llm_model", m);
+    setProvider(p);
+    setModel(m);
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid="settings-page">
       <select
         data-testid="llm-provider-select"
         className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-200"
         value={selectedProvider}
         onChange={(e) => {
           const p = e.target.value;
-          setSelectedProvider(p);
+          setProvider(p);
           save(p, "");
           fetchModels(p);
         }}
@@ -202,7 +205,7 @@ function LLMSettings() {
         className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-200"
         value={selectedModel}
         onChange={(e) => {
-          setSelectedModel(e.target.value);
+          setModel(e.target.value);
           save(selectedProvider, e.target.value);
         }}
         disabled={loadingModels || models.length === 0}

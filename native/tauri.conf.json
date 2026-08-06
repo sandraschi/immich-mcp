@@ -21,7 +21,7 @@
     },
     "bundle": {
         "active": true,
-        "targets": ["msi", "nsis"],
+        "targets": ["nsis"],
         "icon": ["icons/icon.png", "icons/icon.ico"],
         "resources": [
             "resources/immich-mcp-backend.exe",
@@ -39,9 +39,3 @@
     },
     "plugins": {}
 }
-
-
-
-
-
-

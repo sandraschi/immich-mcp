@@ -43,7 +43,7 @@ class ImmichConfig:
     # Legacy single-user support (will be deprecated)
     api_key: str = ""
     # Multi-user configuration
-    users: dict[str, ImmichUser] = None  # type: ignore
+    users: dict[str, ImmichUser] | None = None
     active_user: str = ""
 
     # Common settings
@@ -87,12 +87,16 @@ class ImmichConfig:
         """Get the currently active user configuration"""
         if not self.active_user:
             raise ValueError("No active user configured")
+        if not self.users:
+            raise ValueError("No users configured")
         if self.active_user not in self.users:
             raise ValueError(f"Active user '{self.active_user}' not found")
         return self.users[self.active_user]
 
     def switch_user(self, username: str) -> ImmichUser:
         """Switch to a different user"""
+        if not self.users:
+            raise ValueError("No users configured")
         if username not in self.users:
             raise ValueError(f"User '{username}' not found")
         self.active_user = username
