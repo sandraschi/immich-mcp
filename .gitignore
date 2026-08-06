@@ -75,6 +75,7 @@ log/
 # Temporary files
 *.tmp
 *.bak
+*.bak-*
 *.backup
 temp/
 tmp/

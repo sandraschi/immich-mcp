@@ -16,7 +16,7 @@ Write-Host "=" * 50 -ForegroundColor Cyan
 Write-Host "Checking Immich server connectivity..." -ForegroundColor Yellow
 try {
     $response = Invoke-WebRequest -Uri "http://localhost:2283/api/server-info/ping" -TimeoutSec 5 -ErrorAction Stop
-    Write-Host "âœ“ Immich server is accessible" -ForegroundColor Green
+    Write-Host "âœ" Immich server is accessible" -ForegroundColor Green
 } catch {
     Write-Host "âœ- Immich server not accessible at http://localhost:2283" -ForegroundColor Red
     Write-Host "Please ensure Immich is running before testing." -ForegroundColor Yellow
@@ -44,7 +44,7 @@ if ($photoCount -lt 5) {
 }
 
 $photoCount = (Get-ChildItem "test_photos" -File | Measure-Object).Count
-Write-Host "âœ“ $photoCount test photos ready" -ForegroundColor Green
+Write-Host "âœ" $photoCount test photos ready" -ForegroundColor Green
 
 # Determine test type
 $testArgs = @()
@@ -77,7 +77,7 @@ try {
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -eq 0) {
-        Write-Host "`nâœ“ Test suite completed successfully!" -ForegroundColor Green
+        Write-Host "`nâœ" Test suite completed successfully!" -ForegroundColor Green
     } else {
         Write-Host "`nâœ- Test suite completed with errors (exit code: $exitCode)" -ForegroundColor Red
     }

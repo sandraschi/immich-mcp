@@ -1,7 +1,7 @@
 set windows-shell := ["powershell.exe", "-NoProfile", "-Command"]
 import 'scripts/just/fleet.just'
 
-# ── Dashboard ─────────────────────────────────────────────────────────────────
+# --- Dashboard ---
 
 # Open the interactive recipe dashboard in the browser
 default:
@@ -14,7 +14,7 @@ bootstrap:
     Set-Location web_sota; npm ci; if ($LASTEXITCODE -ne 0) { npm install }
     Write-Host "Pre-commit hooks installed." -ForegroundColor Green
 
-# ── Quality ───────────────────────────────────────────────────────────────────
+# --- Quality ---
 
 # Execute Ruff SOTA v13.1 linting
 lint:
@@ -27,7 +27,7 @@ fix:
     uv run ruff format .
     bun run --cwd web_sota biome
 
-# ── Hardening ─────────────────────────────────────────────────────────────────
+# --- Hardening ---
 
 # Execute Bandit security audit
 check-sec:
@@ -39,7 +39,7 @@ audit-deps:
 	Set-Location '{{justfile_directory()}}'
 	uv run safety check
 
-# ── Tauri NSIS ─────────────────────────────────────────────────────────────────
+# --- Tauri NSIS ---
 
 # Build the Tauri NSIS desktop installer (full pipeline: frontend -> Rust -> NSIS)
 build-native:
@@ -51,3 +51,5 @@ build-native:
 	npx @tauri-apps/cli build --bundles nsis
 
 # Run the CUA smoke test against the installed NSIS app (inherits from fleet.just)
+
+# Bootstrap: install dev deps + pre-commit hook
