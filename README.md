@@ -184,8 +184,8 @@ ImmichMCP is configured in your user profile: `~/.cursor/mcp.json` (typically `C
       "command": "python",
       "args": ["D:/Dev/repos/immich-mcp/src/immich_mcp/server.py"],
       "env": {
-        "IMMICH_SERVER_URL": "http://213.47.34.131:2283",
-        "IMMICH_API_KEY": "eCWNLTQZ7UwAVgbQmtGl0Q8AMEjeuddHy1BVCTWRtNA",
+        "IMMICH_SERVER_URL": "http://localhost:2283",
+        "IMMICH_API_KEY": "your-immich-api-key",
         "PYTHONPATH": "D:/Dev/repos/immich-mcp/src",
         "PYTHONUNBUFFERED": "1"
       }
@@ -211,9 +211,9 @@ ImmichMCP is configured in your user profile: `~/.cursor/mcp.json` (typically `C
 - Try restarting Cursor after configuration changes
 
 ** "Connection failed" or "API key invalid"**
-- Verify Immich server is running on the configured URL (`http://213.47.34.131:2283`)
+- Verify Immich server is running on the configured URL (`IMMICH_SERVER_URL`)
 - Check API key in Immich settings  Account  API Keys
-- Test connection manually: `curl -H "x-api-key: eCWNLTQZ7UwAVgbQmtGl0Q8AMEjeuddHy1BVCTWRtNA" http://213.47.34.131:2283/api/auth/status`
+- Test connection manually: `curl -H "x-api-key: YOUR_API_KEY" http://localhost:2283/api/auth/status`
 
 ** "Import errors" or "Module not found"**
 - Ensure you're using Python 3.11+
@@ -734,3 +734,5 @@ To start the webapp:
 1. Navigate to the `web_sota` directory.
 2. Run `start.bat` (Windows) or `./start.ps1` (PowerShell).
 3. Open `http://localhost:10838` in your browser.
+
+**Photos page**: timeline grouped by real photo month (year separators, sticky month headers, month rail with scroll-spy + click-to-jump), infinite scroll, and filters (media type, favorites, include archived, date range). Click any thumbnail for the photo viewer: zoom (wheel zoom-to-cursor, buttons, drag-to-pan, double-click, keyboard `+`/`-`/`0`), fullscreen, and a metadata panel (EXIF, camera/lens, dates, dimensions, GPS → maps link, status, smart info, people, albums). Search uses Immich CLIP smart search.

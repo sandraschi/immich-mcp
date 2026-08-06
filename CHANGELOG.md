@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-08-07
+
+### Fixed
+- **Webapp "Failed to fetch" (CORS)**: the webapp REST routes live on a separate FastAPI app (`_web_app`) from the MCP `http_app()`; CORS was only attached to the MCP app, so browsers blocked every `/api/v1/*` fetch while curl/PowerShell worked. Added the fleet CORS middleware to `_web_app` (immich-mcp + rustdesk-mcp, documented in `CORS_STANDARD.md`).
+- **Health-poll log spam**: `useBackendStatus` reset the backoff counter on every successful poll, so a healthy backend was probed every 1s forever (several requests/sec per open tab). Healthy state now polls every 10s; exponential backoff (1s/2s/4s/8s/16s) only while unreachable.
+- **Timeline showed import dates, filter matched real dates**: the grid grouped by `createdAt` (batch import time) while the date filter matched `fileCreatedAt`/EXIF — for bulk-imported libraries these disagree wildly (e.g. 34k photos imported Jan 2026 but taken 2017-2025). Timeline now displays `fileCreatedAt`.
+- **Rapid filter edits dropped requests**: changing From and To in quick succession discarded the second request (busy-guard), leaving stale-range results on screen. Reset loads now always win; stale in-flight responses are discarded via a request-sequence counter.
+
+### Added
+- **Timeline filters** (`GET /api/v1/photos/timeline`): `asset_type` (IMAGE/VIDEO), `is_favorite`, `with_archived`, `taken_after`/`taken_before` (ISO dates) — all official Immich `/search/metadata` params. Paginated envelope `{items, page, limit, total, has_more}`; real totals from `/server/statistics` on the unfiltered view.
+- **Timeline component** (webapp): month rail with scroll-spy + click-to-jump, year separators, sticky month headers, infinite scroll (IntersectionObserver) with a Load-more fallback.
+- **Photo viewer** (webapp): click a thumbnail to open a lightbox with zoom (wheel zoom-to-cursor, +/- buttons, reset, drag-to-pan, double-click toggle, keyboard `+`/`-`/`0`), fullscreen (Fullscreen API), and a metadata panel (EXIF, camera, dates, dimensions, GPS → maps link, status badges, smart info, people, albums).
+- **`GET /api/v1/photos/{asset_id}/file`**: full-size original proxy (images + videos) via Immich `GET /assets/:id/original`.
+
 ## [1.6.2] - 2026-08-06
 
 ### Fixed

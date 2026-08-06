@@ -197,8 +197,8 @@ ImmichMCP is configured in your user profile: `~/.cursor/mcp.json` (typically `C
       "command": "python",
       "args": ["D:/Dev/repos/immich-mcp/src/immich_mcp/server.py"],
       "env": {
-        "IMMICH_SERVER_URL": "http://213.47.34.131:2283",
-        "IMMICH_API_KEY": "eCWNLTQZ7UwAVgbQmtGl0Q8AMEjeuddHy1BVCTWRtNA",
+        "IMMICH_SERVER_URL": "http://localhost:2283",
+        "IMMICH_API_KEY": "your-immich-api-key",
         "PYTHONPATH": "D:/Dev/repos/immich-mcp/src",
         "PYTHONUNBUFFERED": "1"
       }
@@ -224,9 +224,9 @@ ImmichMCP is configured in your user profile: `~/.cursor/mcp.json` (typically `C
 - Try restarting Cursor after configuration changes
 
 ** "Connection failed" or "API key invalid"**
-- Verify Immich server is running on the configured URL (`http://213.47.34.131:2283`)
+- Verify Immich server is running on the configured URL (`IMMICH_SERVER_URL`)
 - Check API key in Immich settings  Account  API Keys
-- Test connection manually: `curl -H "x-api-key: eCWNLTQZ7UwAVgbQmtGl0Q8AMEjeuddHy1BVCTWRtNA" http://213.47.34.131:2283/api/auth/status`
+- Test connection manually: `curl -H "x-api-key: YOUR_API_KEY" http://localhost:2283/api/auth/status`
 
 ** "Import errors" or "Module not found"**
 - Ensure you're using Python 3.11+
@@ -480,16 +480,20 @@ python run_http_server.py --transport http --port 10839
 ```
 
 **Available REST endpoints:**
-- `GET /immich-mcp/api/v1/health` - Health check
-- `POST /immich-mcp/api/v1/photos/upload` - Upload photos
-- `GET /immich-mcp/api/v1/photos/search` - Search photos
-- `GET /immich-mcp/api/v1/photos/{asset_id}` - Get photo info
-- `GET /immich-mcp/api/v1/albums` - List albums
-- `POST /immich-mcp/api/v1/albums` - Create album
-- `POST /immich-mcp/api/v1/albums/{id}/photos` - Add photos to album
-- `GET /immich-mcp/api/v1/system/storage` - Storage info
-- `POST /immich-mcp/api/v1/system/backup` - Backup photos
-- *And 6+ additional endpoints...*
+- `GET /api/v1/health` - Health check
+- `GET /api/v1/photos/timeline` - Timeline with filters + pagination (`page`, `limit`, `asset_type`, `is_favorite`, `with_archived`, `taken_after`, `taken_before`; returns `{items, page, limit, total, has_more}`)
+- `POST /api/v1/photos/upload` - Upload photos
+- `GET /api/v1/photos/search` - Search photos (smart/CLIP)
+- `GET /api/v1/photos/{asset_id}` - Get photo info + full EXIF metadata
+- `GET /api/v1/photos/{asset_id}/thumbnail` - Thumbnail proxy (WEBP)
+- `GET /api/v1/photos/{asset_id}/file` - Full-size original proxy (images + videos)
+- `GET /api/v1/photos/{asset_id}/ocr` - OCR word boxes for an asset
+- `GET /api/v1/albums` - List albums
+- `POST /api/v1/albums` - Create album
+- `POST /api/v1/albums/{id}/photos` - Add photos to album
+- `GET /api/v1/system/storage` - Storage info
+- `POST /api/v1/system/backup` - Backup photos
+- *And more endpoints — see `src/immich_mcp/api/v1/routes.py`*
 
 ### Integration Benefits
 
