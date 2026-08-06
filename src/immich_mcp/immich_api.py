@@ -330,18 +330,56 @@ class ImmichAPIClient:
         Uses the paginated metadata search as the timeline source. The legacy
         GET /assets and POST /search/assets endpoints no longer exist in v2.7+.
         """
+        items, _ = await self.search_metadata(page=page, size=size)
+        return items
+
+    async def search_metadata(
+        self,
+        page: int = 1,
+        size: int = 100,
+        *,
+        asset_type: str | None = None,
+        is_favorite: bool | None = None,
+        is_archived: bool | None = None,
+        with_archived: bool | None = None,
+        taken_after: str | None = None,
+        taken_before: str | None = None,
+    ) -> tuple[list[dict], int | None]:
+        """Paginated metadata search with filters (POST /search/metadata, v2.7+ / v3).
+
+        Returns ``(items, total)`` — total is None when the server omits it.
+
+        Filters are official Immich ``/search/metadata`` params only (see AGENTS.md
+        API contract notes): type, isFavorite, isArchived, withArchived,
+        takenAfter, takenBefore.
+        """
         size = min(size, 1000)
-        body = {"page": page, "size": size, "order": "desc"}
+        body: dict = {"page": page, "size": size, "order": "desc"}
+        if asset_type:
+            body["type"] = asset_type
+        if is_favorite is not None:
+            body["isFavorite"] = is_favorite
+        if is_archived is not None:
+            body["isArchived"] = is_archived
+        if with_archived is not None:
+            body["withArchived"] = with_archived
+        if taken_after:
+            body["takenAfter"] = taken_after
+        if taken_before:
+            body["takenBefore"] = taken_before
         result = await self._post("/search/metadata", data=body)
         if isinstance(result, list):
-            return result
-        assets = result.get("assets", {})
+            return result, None
+        assets = result.get("assets")
+        total: int | None = None
         if isinstance(assets, dict):
-            items = assets.get("items", [])
-            if isinstance(items, list):
-                return items
+            total = assets.get("total")
+            if isinstance(assets.get("items"), list):
+                return assets["items"], total
+        if total is None:
+            total = result.get("total")
         items = result.get("items", [])
-        return items if isinstance(items, list) else []
+        return items if isinstance(items, list) else [], total
 
     async def get_map_assets(self) -> list[dict]:
         """Get all geotagged assets for map display (Immich getMapMarkers-style)."""
@@ -895,6 +933,10 @@ class ImmichAPIClient:
     async def get_asset_thumbnail(self, asset_id: str, format: str = "WEBP") -> bytes:
         """Get the thumbnail bytes for an asset. Immich API: GET /assets/:id/thumbnail."""
         return await self.get_binary(f"/assets/{asset_id}/thumbnail", params={"format": format})
+
+    async def get_asset_original(self, asset_id: str) -> bytes:
+        """Get the original file bytes for an asset. Immich API: GET /assets/:id/original."""
+        return await self.get_binary(f"/assets/{asset_id}/original")
 
     async def get_all_people(self) -> list[dict]:
         """Get all detected people"""

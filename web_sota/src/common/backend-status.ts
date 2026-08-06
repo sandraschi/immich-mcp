@@ -13,10 +13,12 @@ export function useBackendStatus() {
   const poll = useCallback(async () => {
     const h = await checkBackendHealth();
     setHealth(h);
-    setState(h.status === "ok" ? "online" : "offline");
-    if (h.status === "ok") {
+    const healthy = h.status === "ok";
+    setState(healthy ? "online" : "offline");
+    if (healthy) {
       attemptsRef.current = 0;
     }
+    return healthy;
   }, []);
 
   useEffect(() => {
@@ -26,11 +28,16 @@ export function useBackendStatus() {
     const schedule = (delayMs: number) => {
       if (cancelled) return;
       timerRef.current = window.setTimeout(async () => {
-        await poll();
-        const backoff = [1000, 2000, 4000, 8000, 16000];
-        const idx = Math.min(attemptsRef.current, backoff.length - 1);
-        attemptsRef.current += 1;
-        schedule(backoff[idx]);
+        const healthy = await poll();
+        if (healthy) {
+          // Steady-state: poll every 10s, not every 1s (log spam).
+          schedule(10_000);
+        } else {
+          const backoff = [1000, 2000, 4000, 8000, 16000];
+          const idx = Math.min(attemptsRef.current, backoff.length - 1);
+          attemptsRef.current += 1;
+          schedule(backoff[idx]);
+        }
       }, delayMs);
     };
 

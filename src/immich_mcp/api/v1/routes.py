@@ -187,6 +187,29 @@ async def get_photo_thumbnail(asset_id: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.get("/photos/{asset_id}/file")
+async def get_photo_file(asset_id: str):
+    """Proxy for the full-size original asset (images and videos)."""
+    try:
+        from ...server import mcp
+
+        client = mcp.immich_client
+        if client is None:
+            raise HTTPException(status_code=503, detail="Immich client not initialized")
+        content = await client.get_asset_original(asset_id)
+        media_type = "application/octet-stream"
+        try:
+            info = await client.get_asset_info(asset_id)
+            media_type = info.get("originalMimeType") or media_type
+        except Exception:
+            pass
+        return Response(content=content, media_type=media_type)
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.get("/people")
 async def get_people():
     """Get list of detected people."""
@@ -252,9 +275,19 @@ async def upload_photos(
 async def get_timeline(
     page: int = 1,
     limit: int = 100,
+    asset_type: str | None = None,
+    is_favorite: bool | None = None,
+    is_archived: bool | None = None,
+    with_archived: bool | None = None,
+    taken_after: str | None = None,
+    taken_before: str | None = None,
     client: ImmichAPIClient = Depends(get_api_client),
 ):
-    """Get timeline assets (all/recent). Default view for Photos page."""
+    """Get timeline assets with filters (type, favorite, archived, date range).
+
+    Returns a paginated envelope: {items, page, limit, total, has_more}.
+    Filters are official Immich /search/metadata params.
+    """
     try:
         from ...server import mcp
 
@@ -266,18 +299,57 @@ async def get_timeline(
                     "and restart the backend."
                 ),
             )
-        items = await mcp.immich_client.get_timeline_assets(page=page, size=limit)
+        items, _ = await mcp.immich_client.search_metadata(
+            page=page,
+            size=limit,
+            asset_type=asset_type,
+            is_favorite=is_favorite,
+            is_archived=is_archived,
+            with_archived=with_archived,
+            taken_after=taken_after,
+            taken_before=taken_before,
+        )
         out = []
         for photo in items:
             out.append(
                 {
                     "id": photo.get("id", ""),
                     "original_filename": photo.get("originalFileName", "Unknown"),
-                    "created_at": photo.get("createdAt", photo.get("fileCreatedAt", "")),
+                    # Real photo date, not the import date — the date filter
+                    # (takenAfter/takenBefore) matches fileCreatedAt, so the
+                    # timeline must display the same field to stay consistent.
+                    "created_at": photo.get("fileCreatedAt", photo.get("createdAt", "")),
+                    "type": photo.get("type", ""),
                     "smart_search_score": photo.get("score"),
                 }
             )
-        return out
+        # Immich's /search/metadata "assets.total" is the PAGE count, not the
+        # overall total — do not use it. has_more = full page fetched.
+        has_more = len(items) == limit
+        total = None
+        filters_active = any(
+            [
+                asset_type,
+                is_favorite is not None,
+                is_archived is not None,
+                with_archived is not None,
+                taken_after,
+                taken_before,
+            ]
+        )
+        if not filters_active:
+            try:
+                stats = await mcp.immich_client.get_server_stats()
+                total = int(stats.get("photos", 0) or 0) + int(stats.get("videos", 0) or 0)
+            except Exception:
+                total = None
+        return {
+            "items": out,
+            "page": page,
+            "limit": limit,
+            "total": total or 0,
+            "has_more": has_more,
+        }
     except ImmichAPIError as e:
         raise _immich_error_to_http(e) from e
     except (httpx.ConnectError, httpx.TimeoutException) as e:

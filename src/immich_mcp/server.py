@@ -198,6 +198,8 @@ if _is_stdio_mode:
 # FastMCP 3.1: separate FastAPI app for custom routes; mount MCP HTTP app at /mcp
 from contextlib import asynccontextmanager
 
+from fastapi.middleware.cors import CORSMiddleware
+
 
 @asynccontextmanager
 async def _web_lifespan(_app: FastAPI):
@@ -213,6 +215,27 @@ _web_app = FastAPI(
     description="Industrialized FastMCP 3.2.0 server for Immich photo management",
     version="1.5.0",
     lifespan=_web_lifespan,
+)
+# Fleet CORS standard (mcp-central-docs/standards/CORS_STANDARD.md) — the webapp
+# REST routes must send CORS headers for the browser (dev Vite + Tauri WebView).
+# Without this, the frontend fetch to /api/v1/* fails with "Failed to fetch".
+_web_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:10838",
+        "http://127.0.0.1:10838",
+        "tauri://localhost",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+    ],
+    allow_origin_regex=(
+        r"https?://(?:[a-zA-Z0-9-]+\.ts\.net|.*?\.tail-[a-f0-9]+\.ts\.net|"
+        r"tauri\.localhost|localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|"
+        r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|100\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d+)?$|^tauri://localhost$"
+    ),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 _web_app.include_router(v1_router, prefix="/api/v1")
 _web_app.mount("/mcp", mcp.http_app(path="/"))
