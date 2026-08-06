@@ -44,16 +44,16 @@ async def api_client(immich_config):
 
 
 class TestImmichV240Integration:
-    """Integration tests against real Immich v2.4.0 server"""
+    """Integration tests against a real Immich server (v2.7+/v3 contracts)"""
 
     class TestSearchMetadataEndpoint:
-        """Test the new search/metadata endpoint integration"""
+        """Test the search/metadata endpoint integration"""
 
         @pytest.mark.asyncio
         async def test_search_metadata_basic(self, api_client):
-            """Test basic search/metadata endpoint functionality"""
+            """Test basic search/metadata endpoint functionality (POST only)"""
             try:
-                result = await api_client._get("/search/metadata", params={"page": 1, "size": 10, "type": "ASSET"})
+                result = await api_client._post("/search/metadata", data={"page": 1, "size": 10})
 
                 # Verify response structure
                 assert "assets" in result
@@ -66,6 +66,17 @@ class TestImmichV240Integration:
 
             except ImmichAPIError as e:
                 pytest.fail(f"Search/metadata endpoint failed: {e}")
+
+        @pytest.mark.asyncio
+        async def test_timeline_search(self, api_client):
+            """Test the timeline search path (POST /search/metadata)"""
+            try:
+                items = await api_client.get_timeline_assets(page=1, size=10)
+                assert isinstance(items, list)
+                if items:
+                    assert "id" in items[0]
+            except ImmichAPIError as e:
+                pytest.fail(f"Timeline search failed: {e}")
 
         @pytest.mark.asyncio
         async def test_smart_search_integration(self, api_client):
@@ -104,27 +115,19 @@ class TestImmichV240Integration:
             except ImmichAPIError as e:
                 pytest.fail(f"Filename search failed: {e}")
 
-    class TestAssetAccessLimitation:
-        """Test asset access limitations in v2.4.0"""
+    class TestAssetAccess:
+        """Test asset access (GET /assets/{id} is available since v2.4)"""
 
         @pytest.mark.asyncio
-        async def test_individual_asset_access_blocked(self, api_client):
-            """Test that individual asset access is not available in v2.4.0"""
+        async def test_individual_asset_access_works(self, api_client):
+            """Test that individual asset access works"""
             try:
-                # Try to get first asset from search
+                # Get first asset from search
                 assets = await api_client.search_photos("", search_type="filename", limit=1)
                 if len(assets) > 0:
                     asset_id = assets[0]["id"]
-
-                    # Try direct asset access (should fail in v2.4.0)
-                    try:
-                        await api_client._get(f"/assets/{asset_id}")
-                        pytest.fail("Individual asset access should not work in v2.4.0")
-                    except ImmichAPIError as e:
-                        if "404" in str(e) or "not found" in str(e).lower():
-                            pass
-                        else:
-                            raise
+                    asset_info = await api_client._get(f"/assets/{asset_id}")
+                    assert asset_info["id"] == asset_id
                 else:
                     pass
 
@@ -132,15 +135,15 @@ class TestImmichV240Integration:
                 pass
 
         @pytest.mark.asyncio
-        async def test_get_asset_info_fallback_works(self, api_client):
-            """Test that get_asset_info fallback works in v2.4.0"""
+        async def test_get_asset_info_works(self, api_client):
+            """Test that get_asset_info works against the real server"""
             try:
                 # Get an asset via search
                 assets = await api_client.search_photos("", search_type="filename", limit=1)
                 if len(assets) > 0:
                     asset_id = assets[0]["id"]
 
-                    # Try to get asset info (should work via fallback)
+                    # Try to get asset info
                     asset_info = await api_client.get_asset_info(asset_id)
 
                     assert asset_info["id"] == asset_id
@@ -151,32 +154,33 @@ class TestImmichV240Integration:
                     pass
 
             except ImmichAPIError as e:
-                pytest.fail(f"Asset info fallback failed: {e}")
+                pytest.fail(f"Asset info failed: {e}")
 
     class TestServerInfoAdaptation:
-        """Test server info adaptation for v2.4.0"""
+        """Test server info adaptation"""
 
         @pytest.mark.asyncio
-        async def test_server_info_detects_v240(self, api_client):
-            """Test that server info correctly detects v2.4.0+"""
+        async def test_server_info_detects_v2_plus(self, api_client):
+            """Test that server info correctly detects v2+"""
             server_info = await api_client.get_server_info()
 
-            # Verify v2.4.0+ detection
+            # Verify v2+ detection
             assert server_info["is_v2_plus"] is True
             assert "api_architecture" in server_info
             assert server_info["api_architecture"] == "search_based"
-            assert server_info["individual_asset_access"] is False
+            assert server_info["individual_asset_access"] is True
 
         @pytest.mark.asyncio
-        async def test_server_stats_adapt_to_v240(self, api_client):
-            """Test that server stats work without /server-info endpoint"""
+        async def test_server_stats_real_endpoints(self, api_client):
+            """Test that server stats use /server/storage + /server/statistics"""
             server_stats = await api_client.get_server_stats()
 
-            # Should have basic stats even without /server-info
+            # Should have real stats
             assert "photos" in server_stats
             assert "albums" in server_stats
             assert "api_version" in server_stats
-            assert server_stats["api_version"] == "2.4.0+"
+            assert server_stats["api_version"] != "unknown"
+            assert "usage" in server_stats
 
     class TestBackwardCompatibility:
         """Test that existing functionality still works"""
@@ -274,10 +278,10 @@ class TestImmichV240Integration:
         async def test_pagination_behavior(self, api_client):
             """Test pagination behavior of search endpoint"""
             # Get first page
-            page1 = await api_client._get("/search/metadata", params={"page": 1, "size": 20, "type": "ASSET"})
+            page1 = await api_client._post("/search/metadata", data={"page": 1, "size": 20, "order": "desc"})
 
             # Get second page
-            page2 = await api_client._get("/search/metadata", params={"page": 2, "size": 20, "type": "ASSET"})
+            page2 = await api_client._post("/search/metadata", data={"page": 2, "size": 20, "order": "desc"})
 
             page1["assets"]["total"]
             page1_count = len(page1["assets"]["items"])

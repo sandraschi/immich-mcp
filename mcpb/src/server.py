@@ -54,7 +54,7 @@ _is_stdio_mode = not sys.stdout.isatty()
 
 # NUCLEAR OPTION: Completely disable logger during stdio mode
 # Import logger first, then replace it with a no-op to prevent any stdout writes
-import logging  # noqa: E402
+import logging
 
 if _is_stdio_mode:
     # Replace stdout with our devnull version to catch any accidental writes
@@ -66,10 +66,10 @@ if _is_stdio_mode:
     # protocol that uses stdout.
     pass
 
-import asyncio  # noqa: E402
-from pathlib import Path  # noqa: E402
+import asyncio
+from pathlib import Path
 
-from dotenv import load_dotenv  # noqa: E402
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -79,17 +79,19 @@ load_dotenv(env_path)
 src_dir = Path(__file__).parent.parent
 if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
-from datetime import datetime  # noqa: E402
-from pathlib import Path  # noqa: E402
-from typing import Any  # noqa: E402
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from dotenv import load_dotenv  # noqa: E402
-from fastapi import FastAPI  # noqa: E402
-from fastmcp import FastMCP  # noqa: E402
-from immich_mcp.api.v1.routes import router as v1_router  # noqa: E402
-from immich_mcp.config import ImmichConfig, get_config  # noqa: E402
-from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError  # noqa: E402
-from pydantic import BaseModel, Field  # noqa: E402
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastmcp import FastMCP
+from prefab_ui.app import PrefabApp
+from pydantic import BaseModel, Field
+
+from immich_mcp.api.v1.routes import router as v1_router
+from immich_mcp.config import ImmichConfig, get_config
+from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError
 
 # Configure structured logging
 logging.basicConfig(
@@ -170,21 +172,20 @@ mcp = ImmichMCP()
 _bridge_proxies: list[str] = []
 bridge_urls = os.getenv("MCP_BRIDGE_URLS", "")
 if bridge_urls:
-    try:
+    import contextlib
+
+    with contextlib.suppress(ImportError):
         from fastmcp.server import create_proxy
+
         for url in bridge_urls.split(","):
             url = url.strip()
             if url:
-                try:
+                with contextlib.suppress(Exception):
                     mcp.add_provider(create_proxy(url))
                     _bridge_proxies.append(url)
-                except Exception:
-                    pass
-    except ImportError:
-        pass
 
 # Register agentic workflow tools
-from .agentic import register_agentic_tools  # noqa: E402
+from .agentic import register_agentic_tools
 
 register_agentic_tools()
 
@@ -193,7 +194,7 @@ if _is_stdio_mode and hasattr(sys.stdout, "restore"):
     sys.stdout.restore()
 
 # FastMCP 3.1: separate FastAPI app for custom routes; mount MCP HTTP app at /mcp
-from contextlib import asynccontextmanager  # noqa: E402
+from contextlib import asynccontextmanager
 
 
 @asynccontextmanager
@@ -225,9 +226,9 @@ class PhotoSearchResult(BaseModel):
     id: str = Field(description="Photo asset ID")
     original_filename: str = Field(description="Original filename")
     file_path: str = Field(description="File path on server")
-    device_asset_id: str = Field(description="Device asset identifier")
-    owner_id: str = Field(description="Owner user ID")
-    device_id: str = Field(description="Device ID")
+    device_asset_id: str | None = Field(default=None, description="Device asset identifier")
+    owner_id: str | None = Field(default=None, description="Owner user ID")
+    device_id: str | None = Field(default=None, description="Device ID")
     type: str = Field(description="Asset type (IMAGE/VIDEO)")
     created_at: str = Field(description="Creation timestamp")
     updated_at: str = Field(description="Last update timestamp")
@@ -353,13 +354,12 @@ class ShareResult(BaseModel):
 
 
 class PeopleDetectionResult(BaseModel):
-    """Face detection operation result"""
+    """Face detection job submission result"""
 
-    detected_faces: int = Field(description="Number of faces detected")
-    new_people: int = Field(description="Number of new person clusters")
-    processed_assets: int = Field(description="Number of photos processed")
-    processing_time_seconds: float = Field(description="Detection processing time")
-    people_found: list[dict[str, Any]] = Field(description="List of detected people clusters")
+    job_submitted: bool = Field(description="Whether the face detection job was queued")
+    queue_name: str = Field(description="Immich job queue used (refresh-faces)")
+    asset_count: int = Field(description="Number of photos queued for processing")
+    message: str = Field(description="Human-readable status including how to observe results")
 
 
 class PersonInfo(BaseModel):
@@ -455,7 +455,7 @@ class OcrInfo(BaseModel):
     has_bounding_boxes: bool = Field(description="Whether bounding box data is available (v2.3.0+)")
 
 
-from .immich_api import get_api_client  # noqa: E402
+from .immich_api import get_api_client
 
 # ====== PHASE 1: CORE PHOTO OPERATIONS (5 tools) ======
 
@@ -833,14 +833,14 @@ async def search_photos(
 
 @mcp.tool()
 async def update_asset_visibility(asset_id: str, visibility: str) -> dict:
-    """Update visibility status of a photo or video (v2.5.0+ / Early 2026).
+    """Update visibility status of a photo or video (v2.5.0+).
 
-    Visibility options: 'hidden', 'archived', 'private', 'public'.
-    Required for advanced asset categorization and privacy management.
+    Visibility options: 'archive' (in archive), 'timeline' (normal),
+    'hidden' (hidden from timeline), 'locked' (protected from deletion).
 
     Parameters:
         asset_id (str, REQUIRED): Unique identifier of the asset.
-        visibility (str, REQUIRED): Target visibility state ("hidden", "archived", "private", "public").
+        visibility (str, REQUIRED): One of 'archive', 'timeline', 'hidden', 'locked'.
 
     Returns:
         Dict with success status and descriptive message.
@@ -869,14 +869,15 @@ async def edit_photo(
     width: int | None = None,
     height: int | None = None,
 ) -> dict:
-    """Perform basic image editing: crop, rotate, or mirror (Early 2026).
+    """Perform basic image editing: crop, rotate, or mirror (v2.5.0+).
 
-    Supports non-destructive edits using Immich's native image processor.
+    Writes non-destructive edits via PUT /assets/{id}/edits using Immich's
+    native image processor.
 
     Operations:
-        - rotate: params={angle: 90 | 180 | 270}
-        - mirror: params={direction: 'horizontal' | 'vertical'}
-        - crop: params={x: int, y: int, width: int, height: int}
+        - rotate: angle=90 | 180 | 270
+        - mirror: direction='horizontal' | 'vertical'
+        - crop: x, y, width, height
 
     Parameters:
         asset_id (str, REQUIRED): Unique identifier of the asset.
@@ -1473,6 +1474,39 @@ async def delete_photos(
 # ====== PHASE 2 CATEGORY 1: ALBUM MANAGEMENT (4 tools) ======
 
 
+def _get_album_owner_id(album_data: dict) -> str:
+    """Extract owner ID from album data, supporting legacy ownerId, users list, and v3.0.0 albumUsers list."""
+    if album_data.get("ownerId"):
+        return album_data["ownerId"]
+
+    # Support v3.0.0 albumUsers list
+    for album_user in album_data.get("albumUsers", []):
+        role = album_user.get("role")
+        user_info = album_user.get("user", album_user)
+        user_id = user_info.get("id")
+        if role == "owner" and user_id:
+            return user_id
+
+    # Fallback to legacy users list (e.g. from v2.4.x scaffold drafts)
+    for user in album_data.get("users", []):
+        if user.get("role") == "owner":
+            return user.get("id", "")
+
+    # Last resort: return first user in albumUsers or users
+    for album_user in album_data.get("albumUsers", []):
+        user_info = album_user.get("user", album_user)
+        user_id = user_info.get("id")
+        if user_id:
+            return user_id
+
+    for user in album_data.get("users", []):
+        user_id = user.get("id")
+        if user_id:
+            return user_id
+
+    return ""
+
+
 @mcp.tool()
 async def create_album(name: str, description: str | None = None, asset_ids: list[str] | None = None) -> AlbumResult:
     r"""Create a new album with optional assets and description.
@@ -1583,7 +1617,7 @@ async def create_album(name: str, description: str | None = None, asset_ids: lis
             description=result.get("description"),
             created_at=result["createdAt"],
             asset_count=result.get("assetCount", 0),
-            owner_id=result["ownerId"],
+            owner_id=_get_album_owner_id(result),
         )
 
     except ImmichAPIError as e:
@@ -1752,7 +1786,7 @@ async def list_albums(*, shared: bool | None = None, include_stats: bool = True)
                 created_at=album_data["createdAt"],
                 updated_at=album_data["updatedAt"],
                 asset_count=album_data.get("assetCount", 0),
-                owner_id=album_data["ownerId"],
+                owner_id=_get_album_owner_id(album_data),
                 shared=album_data.get("shared", False),
                 album_thumbnail_asset_id=album_data.get("albumThumbnailAssetId"),
                 start_date=album_data.get("startDate"),
@@ -1855,54 +1889,49 @@ async def share_album(
 
 @mcp.tool()
 async def detect_people(asset_ids: list[str] | None = None, *, force_reprocess: bool = False) -> PeopleDetectionResult:
-    r"""Run face detection on photos and return clustering results.
+    r"""Queue face detection for photos (v2.4+ / v3).
+
+    Submits the per-asset 'refresh-faces' job via POST /assets/jobs. Immich
+    processes face detection asynchronously - this tool reports the job
+    submission; poll tag_person/search results (GET /people) afterward to
+    see new person clusters.
 
     Parameters:
         asset_ids (List[str], OPTIONAL):
             Specific photos to process.
             Format: ["id1", "id2", "id3"]
-            When None: Processes all unprocessed photos in library.
-            Default: None
+            When None: Nothing is queued (the API requires explicit asset IDs).
 
         force_reprocess (bool, OPTIONAL):
-            Whether to re-detect faces even if already processed.
-            When True: Re-processes all specified photos.
-            When False: Skips photos that already have face detection.
-            Default: False
+            Accepted for compatibility; the v2.7+ / v3 job API always refreshes
+            faces for the given assets.
 
     Returns:
         PeopleDetectionResult containing:
-            - detected_faces (int): Number of faces detected
-            - new_people (int): Number of new people clusters created
-            - processed_assets (int): Number of photos processed
-            - processing_time_seconds (float): Time taken for processing
-            - people_found (List[Dict]): List of detected people with metadata
+            - job_submitted (bool): Whether the job was queued
+            - queue_name (str): The Immich queue used ("refresh-faces")
+            - asset_count (int): Number of photos queued
+            - message (str): Status and how to observe results
     """
     try:
-        start_time = asyncio.get_event_loop().time()
         client = await get_api_client()
 
         result = await client.run_face_detection(asset_ids=asset_ids, force_reprocess=force_reprocess)
 
-        end_time = asyncio.get_event_loop().time()
-        processing_time = end_time - start_time
-
         return PeopleDetectionResult(
-            detected_faces=result.get("detected_faces", 0),
-            new_people=result.get("new_people", 0),
-            processed_assets=result.get("processed_assets", 0),
-            processing_time_seconds=processing_time,
-            people_found=result.get("people_found", []),
+            job_submitted=result.get("job_submitted", False),
+            queue_name=result.get("queue_name", "refresh-faces"),
+            asset_count=result.get("asset_count", 0),
+            message=result.get("message", ""),
         )
 
     except ImmichAPIError as e:
         logger.error("Immich API error in detect_people: %s", e)
         return PeopleDetectionResult(
-            detected_faces=0,
-            new_people=0,
-            processed_assets=0,
-            processing_time_seconds=0.0,
-            people_found=[],
+            job_submitted=False,
+            queue_name="refresh-faces",
+            asset_count=0,
+            message=f"Failed to queue face detection: {e}",
         )
 
 
@@ -2293,14 +2322,6 @@ async def get_library_info(library_id: str) -> dict:
     try:
         client = await get_api_client()
         library_info = await client.get_library_info(library_id)
-
-        # Get additional location details
-        try:
-            locations = await client.get_library_locations(library_id)
-            library_info["locations"] = locations
-        except Exception:
-            library_info["locations"] = []
-
         return library_info
     except Exception as e:
         logger.error(f"Failed to get library info for {library_id}: {e}")
@@ -2369,7 +2390,7 @@ async def create_library(
 
 
 @mcp.tool()
-async def scan_library(library_id: str, refresh_modified_files: bool = False, refresh_all_files: bool = False) -> dict:
+async def scan_library(library_id: str) -> dict:
     """Scan a library for new or changed photos from external folders.
 
     This is the key solution to 'unwieldy external folder management' - instead
@@ -2378,8 +2399,6 @@ async def scan_library(library_id: str, refresh_modified_files: bool = False, re
 
     Args:
         library_id: The library ID to scan
-        refresh_modified_files: Also refresh metadata for modified files (slower)
-        refresh_all_files: Refresh all files regardless of modification date (slowest)
 
     Returns:
         Scan results with statistics on discovered and imported photos
@@ -2392,29 +2411,17 @@ async def scan_library(library_id: str, refresh_modified_files: bool = False, re
         # Get library info first for context
         library_info = await client.get_library_info(library_id)
 
-        # Perform the scan
-        scan_result = await client.scan_library(
-            library_id=library_id,
-            refresh_modified_files=refresh_modified_files,
-            refresh_all_files=refresh_all_files,
-        )
-
-        # Calculate scan scope
-        scope = "new files only"
-        if refresh_modified_files:
-            scope = "new and modified files"
-        if refresh_all_files:
-            scope = "all files (full refresh)"
+        # Perform the scan (v2.7+ / v3 endpoint takes no body)
+        scan_result = await client.scan_library(library_id)
 
         return {
             "success": True,
             "library_name": library_info.get("name", "Unknown"),
-            "scan_scope": scope,
+            "scan_scope": "new and modified files (server import settings)",
             "scan_result": scan_result,
-            "message": f"Library scan completed for {scope}",
+            "message": f"Library scan completed for {library_info.get('name', library_id)}",
             "tips": [
-                "Use refresh_modified_files for regular updates",
-                "Use refresh_all_files for initial setup or major changes",
+                "Run scan_library regularly to pick up new files",
                 "Check scan results for any import errors",
             ],
         }
@@ -2428,103 +2435,6 @@ async def scan_library(library_id: str, refresh_modified_files: bool = False, re
 
 
 @mcp.tool()
-async def add_library_location(library_id: str, path: str) -> dict:
-    """Add a new external folder path to an Immich library.
-
-    This directly addresses the 'unwieldy external folder management' issue by
-    allowing you to easily add new photo folders to your library organization.
-    No more manual folder management - just add the path and scan.
-
-    Args:
-        library_id: The library ID to add the location to
-        path: Full file system path to add (e.g., "D:\\Photos\\Vacation")
-
-    Returns:
-        Updated library configuration with new location
-
-    Austrian efficiency: Simple external folder integration.
-    """
-    try:
-        client = await get_api_client()
-
-        # Validate path exists
-        if not Path(path).exists():
-            return {
-                "error": f"Path does not exist: {path}",
-                "suggestion": "Verify the path is correct and accessible",
-            }
-
-        # Add the location
-        result = await client.add_library_location(library_id, path)
-
-        # Get updated library info
-        library_info = await client.get_library_info(library_id)
-
-        return {
-            "success": True,
-            "library_name": library_info.get("name", "Unknown"),
-            "new_location": path,
-            "total_locations": len(library_info.get("importPaths", [])),
-            "result": result,
-            "message": f"Added location '{path}' to library",
-            "next_steps": [
-                "Run scan_library to import photos from new location",
-                "Configure exclusion patterns if needed",
-            ],
-        }
-    except Exception as e:
-        logger.error(f"Failed to add location {path} to library {library_id}: {e}")
-        return {
-            "error": str(e),
-            "library_id": library_id,
-            "path": path,
-            "suggestion": "Check library permissions and path accessibility",
-        }
-
-
-@mcp.tool()
-async def remove_library_location(library_id: str, path: str) -> dict:
-    """Remove an external folder path from an Immich library.
-
-    Clean up your library organization by removing folders that are no longer
-    needed. This helps maintain tidy library configurations.
-
-    Args:
-        library_id: The library ID to remove the location from
-        path: Full file system path to remove
-
-    Returns:
-        Updated library configuration without the removed location
-    """
-    try:
-        client = await get_api_client()
-
-        # Remove the location
-        result = await client.remove_library_location(library_id, path)
-
-        # Get updated library info
-        library_info = await client.get_library_info(library_id)
-
-        return {
-            "success": True,
-            "library_name": library_info.get("name", "Unknown"),
-            "removed_location": path,
-            "remaining_locations": len(library_info.get("importPaths", [])),
-            "result": result,
-            "message": f"Removed location '{path}' from library",
-            "warning": "Photos from this location may still exist in the library",
-        }
-    except Exception as e:
-        logger.error(f"Failed to remove location {path} from library {library_id}: {e}")
-        return {
-            "error": str(e),
-            "library_id": library_id,
-            "path": path,
-            "suggestion": "Verify the location exists in the library",
-        }
-
-
-@mcp.tool()
 async def manage_library(
     library_id: str,
     action: str,
@@ -2532,20 +2442,13 @@ async def manage_library(
     import_paths: list[str] | None = None,
     exclusion_patterns: list[str] | None = None,
 ) -> dict:
-    """Perform various management actions on an Immich library.
-
-    Comprehensive library management including updates, optimization, cleanup,
-    and maintenance operations. This provides the control needed for managing
-    external photo folder imports effectively.
+    """Perform management actions on an Immich library.
 
     Args:
         library_id: The library ID to manage
         action: Management action to perform:
-            - "update": Update library configuration
-            - "refresh": Refresh all metadata
-            - "optimize": Optimize database performance
-            - "empty_trash": Remove deleted items permanently
-            - "clean_bundles": Remove old bundle files to free space
+            - "update": Update library configuration (name, import_paths, exclusion_patterns)
+            - "statistics": Get storage statistics for the library (photos/videos/usage)
         name: New library name (for update action)
         import_paths: Updated import paths (for update action)
         exclusion_patterns: Updated exclusion patterns (for update action)
@@ -2577,31 +2480,16 @@ async def manage_library(
             )
             message = f"Updated library '{library_name}' configuration"
 
-        elif action == "refresh":
-            result = await client.refresh_library_metadata(library_id)
-            message = f"Refreshed metadata for library '{library_name}'"
-
-        elif action == "optimize":
-            result = await client.optimize_library(library_id)
-            message = f"Optimized database for library '{library_name}'"
-
-        elif action == "empty_trash":
-            result = await client.empty_library_trash(library_id)
-            message = f"Emptied trash for library '{library_name}'"
-
-        elif action == "clean_bundles":
-            result = await client.clean_library_bundles(library_id)
-            message = f"Cleaned bundles for library '{library_name}'"
+        elif action == "statistics":
+            result = await client.get_library_statistics(library_id)
+            message = f"Retrieved statistics for library '{library_name}'"
 
         else:
             return {
                 "error": f"Unknown action: {action}",
                 "available_actions": [
                     "update",
-                    "refresh",
-                    "optimize",
-                    "empty_trash",
-                    "clean_bundles",
+                    "statistics",
                 ],
             }
 
@@ -2799,11 +2687,251 @@ async def get_user_libraries(username: str | None = None) -> dict:
         }
 
 
+@mcp.tool()
+async def download_photo_to_temp(photo_id: str) -> dict:
+    """Download the original photo or video asset from Immich to a local temporary path.
+
+    This acts as a bridge when combining Immich with local media editing tools
+    such as GIMP (via gimp-mcp). You download the file, pass its local path to GIMP,
+    and then upload the modified file back.
+
+    Parameters:
+        photo_id (str, REQUIRED):
+            The UUID of the photo/video asset to download.
+    """
+    try:
+        from .bridge import download_asset_to_temp
+
+        local_path = await download_asset_to_temp(photo_id)
+        return {
+            "success": True,
+            "message": f"Successfully downloaded photo {photo_id} to {local_path}",
+            "local_path": local_path,
+        }
+    except Exception as e:
+        logger.error(f"Failed to download photo {photo_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@mcp.tool()
+async def sync_metadata_to_exif(photo_id: str, local_path: str) -> dict:
+    """Sync an asset's metadata (description, location, dates) from Immich back into a local file's EXIF.
+
+    Updates the EXIF headers of the specified local image file using metadata retrieved from Immich.
+    Supports description, GPS location, and creation date.
+
+    Parameters:
+        photo_id (str, REQUIRED):
+            The Immich asset UUID to retrieve metadata from.
+        local_path (str, REQUIRED):
+            The absolute path of the local photo file to update.
+    """
+    from pathlib import Path
+
+    import piexif
+
+    path = Path(local_path)
+    if not path.exists():
+        return {"success": False, "error": f"Local file not found: {local_path}"}
+
+    try:
+        client = await get_api_client()
+        # Get asset info
+        asset_info = await client.get_asset_info(photo_id)
+        if not asset_info:
+            return {"success": False, "error": f"Immich asset not found: {photo_id}"}
+
+        # Load EXIF
+        try:
+            exif_dict = piexif.load(str(path))
+        except Exception:
+            exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}
+
+        updated_fields = []
+
+        # 1. Update Description (ImageDescription in 0th IFD, key 270)
+        description = asset_info.get("exifInfo", {}).get("description") or asset_info.get("description")
+        if description:
+            exif_dict["0th"][piexif.ImageIFD.ImageDescription] = description.encode("utf-8")
+            updated_fields.append("description")
+
+        # 2. Update Date/Time
+        created_at = asset_info.get("localDateTime") or asset_info.get("createdAt")
+        if created_at:
+            import contextlib
+
+            with contextlib.suppress(Exception):
+                # Convert ISO to EXIF format YYYY:MM:DD HH:MM:SS
+                dt_str = created_at.replace("-", ":").replace("T", " ")[:19]
+                exif_dict["0th"][piexif.ImageIFD.DateTime] = dt_str.encode("utf-8")
+                exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal] = dt_str.encode("utf-8")
+                exif_dict["Exif"][piexif.ExifIFD.DateTimeDigitized] = dt_str.encode("utf-8")
+                updated_fields.append("date_time")
+
+        # 3. Update GPS
+        exif_gps = asset_info.get("exifInfo", {})
+        lat = exif_gps.get("latitude")
+        lon = exif_gps.get("longitude")
+        if lat is not None and lon is not None:
+
+            def deg_to_dms(deg):
+                abs_deg = abs(deg)
+                d = int(abs_deg)
+                md = (abs_deg - d) * 60
+                m = int(md)
+                s = round((md - m) * 60 * 100)
+                return ((d, 1), (m, 1), (s, 100))
+
+            exif_dict["GPS"][piexif.GPSIFD.GPSLatitudeRef] = b"N" if lat >= 0 else b"S"
+            exif_dict["GPS"][piexif.GPSIFD.GPSLatitude] = deg_to_dms(lat)
+            exif_dict["GPS"][piexif.GPSIFD.GPSLongitudeRef] = b"E" if lon >= 0 else b"W"
+            exif_dict["GPS"][piexif.GPSIFD.GPSLongitude] = deg_to_dms(lon)
+            updated_fields.append("gps")
+
+        if not updated_fields:
+            return {"success": True, "message": "No metadata to sync.", "updated_fields": []}
+
+        # Write EXIF back
+        exif_bytes = piexif.dump(exif_dict)
+        piexif.insert(exif_bytes, str(path))
+
+        return {
+            "success": True,
+            "message": f"Successfully synced metadata ({', '.join(updated_fields)}) to {path.name}",
+            "updated_fields": updated_fields,
+        }
+    except Exception as e:
+        logger.error(f"Failed to sync EXIF metadata: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@mcp.tool()
+async def detect_similar_photos() -> dict:
+    """Retrieve groups of duplicate or highly similar photos identified by Immich's machine learning engine.
+
+    Returns a list of duplicate groups, including asset details (IDs, filenames, sizes)
+    and suggested assets to keep.
+    """
+    try:
+        client = await get_api_client()
+        result = await client._get("/duplicates")
+
+        # Format the output for readability
+        formatted_groups = []
+        for group in result:
+            assets = []
+            for asset in group.get("assets", []):
+                assets.append(
+                    {
+                        "id": asset.get("id"),
+                        "filename": asset.get("originalFileName"),
+                        "size_bytes": asset.get("exifInfo", {}).get("fileSizeInBytes") or asset.get("fileSizeBytes", 0),
+                        "created_at": asset.get("localDateTime") or asset.get("createdAt"),
+                    }
+                )
+
+            formatted_groups.append(
+                {
+                    "duplicate_id": group.get("duplicateId"),
+                    "suggested_keep_ids": group.get("suggestedKeepAssetIds", []),
+                    "assets": assets,
+                }
+            )
+
+        return {
+            "success": True,
+            "duplicate_groups": formatted_groups,
+            "count": len(formatted_groups),
+            "message": f"Retrieved {len(formatted_groups)} groups of duplicate assets.",
+        }
+    except Exception as e:
+        logger.error(f"Failed to detect similar photos: {e}")
+        return {"success": False, "error": str(e)}
+
+
+# ====== SOTA v12.0 FastMCP 3.4+ Features ======
+
+
+@mcp.prompt()
+def explain_photo_ops(topic: str) -> str:
+    """Generate a prompt to help the user discover, download, or edit photos on a specific topic."""
+    return (
+        f"Search for photos of '{topic}' in the Immich library. Once found, "
+        "show their details. If editing is desired, download the original to a "
+        "temporary folder and sync back any local EXIF edits."
+    )
+
+
+@mcp.prompt()
+def organize_vacation_photos(album_name: str) -> str:
+    """Generate a template to orchestrate organizing new photos into a vacation album."""
+    return (
+        f"Help me identify recent photos that should go into the '{album_name}' album. "
+        "Perform a smart search, create the album if it doesn't exist, and add the photo IDs."
+    )
+
+
+@mcp.resource("system://status", description="Exposes the active Immich connection and server health stats.")
+async def get_system_status() -> str:
+    """Retrieve the current active server URL and health stats from Immich."""
+    client = await get_api_client()
+    try:
+        info = await client.get_server_info()
+        version = info.get("version", "unknown")
+        status = info.get("status", "unknown")
+    except Exception as e:
+        version = "unknown"
+        status = f"error: {e}"
+    return f"Active Server: {client.base_url}\nStatus: {status}\nVersion: {version}"
+
+
+@mcp.tool(app=True)
+async def show_server_health_prefab() -> PrefabApp:
+    """Render a SOTA Prefab UI dashboard showing the server connection and health stats."""
+    from prefab_ui.components import Badge, Column, Heading, Row, Text
+    from prefab_ui.components.control_flow import ForEach
+
+    client = await get_api_client()
+    try:
+        info = await client.get_server_info()
+        version = info.get("version", "unknown")
+        status = info.get("status", "healthy")
+        features = info.get("features", [])
+    except Exception as e:
+        version = "unknown"
+        status = f"unhealthy ({e})"
+        features = []
+
+    state = {
+        "version": version,
+        "status": status,
+        "features": [{"name": f} for f in features],
+    }
+
+    with PrefabApp(state=state, css_class="p-6 bg-slate-900 text-white rounded-lg shadow-md max-w-md") as app:
+        Heading("Immich Connection Dashboard", level=1, css_class="text-2xl font-bold mb-4 text-emerald-400")
+        with Row(gap=4, css_class="mb-2"):
+            Text("API URL:", css_class="font-semibold text-slate-300")
+            Text(client.base_url, css_class="text-slate-100")
+        with Row(gap=4, css_class="mb-2"):
+            Text("Version:", css_class="font-semibold text-slate-300")
+            Text("{{ version }}", css_class="text-emerald-300")
+        with Row(gap=4, css_class="mb-4"):
+            Text("Status:", css_class="font-semibold text-slate-300")
+            Badge("{{ status }}", color="emerald" if "healthy" in status else "rose")
+
+        Heading("Server Features", level=2, css_class="text-lg font-semibold mt-4 mb-2 text-slate-200")
+        with Column(gap=2), ForEach("features"):
+            Text("• {{ name }}", css_class="text-slate-300")
+
+    return app
+
+
 def main():
     """Main entry point with unified transport handling (FastMCP 3.1)."""
     from .transport import run_server
 
-    logger.info("Starting ImmichMCP - Industrialized FastMCP 3.2.0 Server")
+    logger.info("Starting ImmichMCP - Industrialized FastMCP 3.4 Server")
     run_server(mcp, server_name="immich-mcp")
 
 

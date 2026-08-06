@@ -156,35 +156,44 @@ class TestServerInfo:
     """Test server stats and server info methods"""
 
     @pytest.mark.asyncio
-    async def test_get_server_stats_fallback(self, api_client):
-        """Test server stats when /server/about succeeds and server-info is bypassed"""
-        server_about_response = {"version": "v2.x", "users": 3}
+    async def test_get_server_stats_real_endpoints(self, api_client):
+        """Test server stats using the current /server/storage + /server/statistics endpoints"""
+        server_about_response = {"version": "v2.7.5"}
         storage_response = {
-            "diskUsage": 1000,
-            "diskAvailable": 2000,
-            "diskSize": 3000,
+            "diskUseRaw": 1000,
+            "diskAvailableRaw": 2000,
+            "diskSizeRaw": 3000,
             "diskUsagePercentage": 33.3,
-            "usageByUser": [],
         }
-        search_metadata_response = {"assets": {"total": 150, "count": 150, "items": []}}
+        stats_response = {
+            "photos": 150,
+            "videos": 20,
+            "usage": 1000,
+            "usageByUser": [{"userId": "u1", "photos": 150}],
+        }
+        albums_response = [{"id": "a1"}, {"id": "a2"}]
 
         with (
             patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get,
-            patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post,
         ):
             mock_get.side_effect = [
                 server_about_response,  # /server/about
-                storage_response,  # /admin/storage
+                storage_response,  # /server/storage
+                stats_response,  # /server/statistics
+                albums_response,  # /albums
             ]
-            mock_post.return_value = search_metadata_response  # /search/metadata
 
             result = await api_client.get_server_stats()
 
             # Verify results
             assert result["photos"] == 150
-            assert result["api_version"] == "v2.x"
+            assert result["videos"] == 20
+            assert result["api_version"] == "v2.7.5"
             assert result["usage"] == 1000
-            assert result["users"] == 3
+            assert result["users"] == 1
+            assert result["albums"] == 2
+            assert result["available"] == 2000
+            assert result["total"] == 3000
 
     @pytest.mark.asyncio
     async def test_get_server_info_healthy(self, api_client):
@@ -199,6 +208,19 @@ class TestServerInfo:
             assert result["version"] == "v2.5.0"
             assert result["status"] == "healthy"
             assert result["multilingual_ocr"] is True
+            assert result["is_v2_plus"] is True
+            assert result["api_architecture"] == "search_based"
+            assert result["individual_asset_access"] is True
+
+    @pytest.mark.asyncio
+    async def test_get_server_info_v3_detection(self, api_client):
+        """Test v3 detection via is_v3"""
+        server_about_response = {"version": "3.1.0"}
+
+        with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = server_about_response
+
+            assert await api_client.is_v3() is True
 
 
 class TestEndpointCompatibility:
@@ -245,16 +267,221 @@ class TestErrorHandling:
     """Test error handling in API responses"""
 
     @pytest.mark.asyncio
-    async def test_ocr_not_found_fallback(self, api_client):
-        """Test asset OCR fallback on 404 error"""
+    async def test_ocr_not_found_raises(self, api_client):
+        """Test that asset OCR raises on 404 (no fabricated empty results)"""
         with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.side_effect = ImmichAPIError("GET /assets/id/ocr failed - HTTP 404: Not Found")
 
-            result = await api_client.get_asset_ocr("test-id")
+            with pytest.raises(ImmichAPIError):
+                await api_client.get_asset_ocr("test-id")
 
-            assert result["text"] == ""
-            assert result["bounding_boxes"] == []
-            assert result["language"] == "unknown"
+
+class TestCurrentApiContracts:
+    """Tests for the v2.7+/v3 API contracts"""
+
+    @pytest.mark.asyncio
+    async def test_timeline_uses_search_metadata(self, api_client):
+        """Timeline must use POST /search/metadata (GET /assets was removed in v2.7+)"""
+        page_response = {"assets": {"items": [{"id": "a1"}, {"id": "a2"}], "total": 2}}
+
+        with patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = page_response
+
+            result = await api_client.get_timeline_assets(page=2, size=50)
+
+            mock_post.assert_called_with("/search/metadata", data={"page": 2, "size": 50, "order": "desc"})
+            assert [a["id"] for a in result] == ["a1", "a2"]
+
+    @pytest.mark.asyncio
+    async def test_delete_to_trash_uses_force_false(self, api_client):
+        """Trash must use DELETE /assets with force=false (no /assets/trash endpoint)"""
+        with patch.object(api_client, "_delete", new_callable=AsyncMock) as mock_delete:
+            mock_delete.return_value = {"success": True}
+
+            result = await api_client.delete_photos(["a1", "a2"], move_to_trash=True)
+
+            mock_delete.assert_called_with("/assets", data={"ids": ["a1", "a2"], "force": False})
+            assert result["trashed_count"] == 2
+            assert result["deleted_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_permanent_delete_uses_force_true(self, api_client):
+        """Permanent delete must use DELETE /assets with force=true"""
+        with patch.object(api_client, "_delete", new_callable=AsyncMock) as mock_delete:
+            mock_delete.return_value = {"success": True}
+
+            result = await api_client.delete_photos(["a1"], move_to_trash=False)
+
+            mock_delete.assert_called_with("/assets", data={"ids": ["a1"], "force": True})
+            assert result["deleted_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_edit_asset_uses_edits_endpoint(self, api_client):
+        """Edits must use PUT /assets/{id}/edits with action/parameters (v2.5.0+)"""
+        with patch.object(api_client, "_put", new_callable=AsyncMock) as mock_put:
+            mock_put.return_value = {"edits": []}
+
+            await api_client.edit_asset("asset-1", "rotate", angle=90)
+
+            mock_put.assert_called_with(
+                "/assets/asset-1/edits", data={"edits": [{"action": "rotate", "parameters": {"angle": 90}}]}
+            )
+
+    @pytest.mark.asyncio
+    async def test_edit_asset_crop_params(self, api_client):
+        """Crop must map x/y/width/height into parameters"""
+        with patch.object(api_client, "_put", new_callable=AsyncMock) as mock_put:
+            mock_put.return_value = {"edits": []}
+
+            await api_client.edit_asset("asset-1", "crop", x=10, y=20, width=100, height=50)
+
+            mock_put.assert_called_with(
+                "/assets/asset-1/edits",
+                data={"edits": [{"action": "crop", "parameters": {"x": 10, "y": 20, "width": 100, "height": 50}}]},
+            )
+
+    @pytest.mark.asyncio
+    async def test_edit_asset_unknown_operation_raises(self, api_client):
+        """Unknown edit operations must raise instead of hitting a nonexistent endpoint"""
+        with pytest.raises(ImmichAPIError):
+            await api_client.edit_asset("asset-1", "blur")
+
+    @pytest.mark.asyncio
+    async def test_upload_uses_iso_dates(self, api_client, tmp_path):
+        """Upload must send ISO-8601 dates and per-version fields"""
+        photo = tmp_path / "test.jpg"
+        photo.write_bytes(b"fake image data")
+
+        with (
+            patch.object(api_client, "is_v3", new_callable=AsyncMock) as mock_v3,
+            patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post,
+        ):
+            mock_v3.return_value = False
+            mock_post.return_value = {"id": "asset-1", "duplicate": False}
+
+            result = await api_client.upload_photos_batch([str(photo)])
+
+            assert result["uploaded_count"] == 1
+            call_data = mock_post.call_args.kwargs["data"]
+            assert call_data["deviceAssetId"] == "test"
+            assert call_data["deviceId"] == "MCP-Upload"
+            assert call_data["fileCreatedAt"].endswith("Z")
+            assert "T" in call_data["fileCreatedAt"]
+
+    @pytest.mark.asyncio
+    async def test_upload_v3_omits_legacy_fields(self, api_client, tmp_path):
+        """v3 upload must omit deviceAssetId/deviceId and send integer duration"""
+        photo = tmp_path / "test.jpg"
+        photo.write_bytes(b"fake image data")
+
+        with (
+            patch.object(api_client, "is_v3", new_callable=AsyncMock) as mock_v3,
+            patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post,
+        ):
+            mock_v3.return_value = True
+            mock_post.return_value = {"id": "asset-1", "duplicate": False}
+
+            result = await api_client.upload_photos_batch([str(photo)])
+
+            assert result["uploaded_count"] == 1
+            call_data = mock_post.call_args.kwargs["data"]
+            assert "deviceAssetId" not in call_data
+            assert "deviceId" not in call_data
+            assert call_data["duration"] == 0
+
+    @pytest.mark.asyncio
+    async def test_face_detection_uses_assets_jobs(self, api_client):
+        """Face detection must queue via POST /assets/jobs with refresh-faces"""
+        with patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = {}
+
+            result = await api_client.run_face_detection(["a1", "a2"])
+
+            mock_post.assert_called_with("/assets/jobs", data={"assetIds": ["a1", "a2"], "name": "refresh-faces"})
+            assert result["job_submitted"] is True
+            assert result["asset_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_ocr_aggregates_box_list(self, api_client):
+        """OCR must aggregate the word-box list from the real endpoint"""
+        box_response = [
+            {
+                "id": "b1",
+                "text": "Hello",
+                "textScore": 0.95,
+                "x1": 1,
+                "y1": 2,
+                "x2": 3,
+                "y2": 4,
+                "x3": 5,
+                "y3": 6,
+                "x4": 7,
+                "y4": 8,
+            },
+            {
+                "id": "b2",
+                "text": "World",
+                "textScore": 0.85,
+                "x1": 9,
+                "y1": 10,
+                "x2": 11,
+                "y2": 12,
+                "x3": 13,
+                "y3": 14,
+                "x4": 15,
+                "y4": 16,
+            },
+        ]
+
+        with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = box_response
+
+            result = await api_client.get_asset_ocr("asset-1")
+
+            assert result["text"] == "Hello World"
+            assert result["confidence"] == 0.9
+            assert len(result["bounding_boxes"]) == 2
+            assert result["bounding_boxes"][0]["x1"] == 1
+
+    @pytest.mark.asyncio
+    async def test_visibility_validation(self, api_client):
+        """Visibility must be validated against the real enum"""
+        with pytest.raises(ImmichAPIError):
+            await api_client.update_asset_visibility("asset-1", "private")
+
+        with patch.object(api_client, "_put", new_callable=AsyncMock) as mock_put:
+            mock_put.return_value = {"visibility": "archive"}
+            result = await api_client.update_asset_visibility("asset-1", "archive")
+            mock_put.assert_called_with("/assets/asset-1", data={"visibility": "archive"})
+            assert result["visibility"] == "archive"
+
+    @pytest.mark.asyncio
+    async def test_get_libraries_handles_plain_array(self, api_client):
+        """GET /libraries returns a plain array in v2.7+"""
+        with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = [{"id": "lib1", "name": "Default"}]
+
+            result = await api_client.get_libraries()
+
+            assert len(result) == 1
+            assert result[0]["name"] == "Default"
+
+    @pytest.mark.asyncio
+    async def test_create_library_includes_owner_id(self, api_client):
+        """create_library must resolve ownerId via /users/me (required field)"""
+        with (
+            patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get,
+            patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post,
+        ):
+            mock_get.return_value = {"id": "user-1"}
+            mock_post.return_value = {"id": "lib-1"}
+
+            result = await api_client.create_library("Test", import_paths=["D:/Photos"])
+
+            mock_post.assert_called_with(
+                "/libraries", {"name": "Test", "ownerId": "user-1", "importPaths": ["D:/Photos"]}
+            )
+            assert result["id"] == "lib-1"
 
 
 class TestImmichMCPIntegration:

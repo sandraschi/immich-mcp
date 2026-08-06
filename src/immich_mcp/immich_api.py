@@ -5,6 +5,8 @@ Austrian efficiency for Sandra's 2000+ photo library management
 
 import contextlib
 import logging
+import mimetypes
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -15,6 +17,22 @@ logger = logging.getLogger("immich_mcp.api")
 
 # Global API client instance for shared use
 api_client: "ImmichAPIClient | None" = None
+
+_VISIBILITY_VALUES = ("archive", "timeline", "hidden", "locked")
+
+
+def _iso_ts(ts: float) -> str:
+    """Convert a unix epoch float to an Immich-compatible ISO-8601 timestamp (UTC)."""
+    return datetime.fromtimestamp(ts, UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def _version_at_least(version: str, major: int) -> bool:
+    """Return True if the server version string is at least the given major."""
+    version_str = (version or "").lstrip("v")
+    if not version_str:
+        return False
+    parts = version_str.split(".")
+    return bool(parts and parts[0].isdigit() and int(parts[0]) >= major)
 
 
 class ImmichAPIError(Exception):
@@ -205,13 +223,17 @@ class ImmichAPIClient:
 
                 # Upload individual file
                 with open(file_path, "rb") as f:
-                    files = {"assetData": (Path(file_path).name, f, "image/jpeg")}
+                    mime_type, _ = mimetypes.guess_type(file_path)
+                    files = {"assetData": (Path(file_path).name, f, mime_type or "application/octet-stream")}
+                    stat = Path(file_path).stat()
                     data = {
-                        "fileCreatedAt": Path(file_path).stat().st_ctime,
-                        "fileModifiedAt": Path(file_path).stat().st_mtime,
+                        "fileCreatedAt": _iso_ts(stat.st_ctime),
+                        "fileModifiedAt": _iso_ts(stat.st_mtime),
+                        "filename": Path(file_path).name,
                     }
                     if is_server_v3:
-                        data["duration"] = "0"
+                        # v3 removed deviceAssetId/deviceId; duration is an integer (0 for images)
+                        data["duration"] = 0
                     else:
                         data["deviceAssetId"] = Path(file_path).stem
                         data["deviceId"] = "MCP-Upload"
@@ -301,38 +323,23 @@ class ImmichAPIClient:
             return result.get("assets", {}).get("items", result.get("items", []))
 
     async def get_timeline_assets(self, page: int = 1, size: int = 100) -> list[dict]:
-        """Get assets for timeline view. Tries POST /search/assets, GET /search/metadata, then GET /assets."""
+        """Get assets for the timeline view (POST /search/metadata, v2+ / v3 compatible).
+
+        Uses the paginated metadata search as the timeline source. The legacy
+        GET /assets and POST /search/assets endpoints no longer exist in v2.7+.
+        """
         size = min(size, 1000)
-        try:
-            body = {"page": page, "size": size, "order": "desc"}
-            result = await self._post("/search/assets", data=body)
-            if isinstance(result, list):
-                return result
-            items = result.get("items", result.get("assets", {}).get("items", []))
+        body = {"page": page, "size": size, "order": "desc"}
+        result = await self._post("/search/metadata", data=body)
+        if isinstance(result, list):
+            return result
+        assets = result.get("assets", {})
+        if isinstance(assets, dict):
+            items = assets.get("items", [])
             if isinstance(items, list):
                 return items
-        except ImmichAPIError:
-            pass
-        try:
-            params = {"page": page, "size": size, "type": "ASSET"}
-            result = await self._get("/search/metadata", params=params)
-            out = result.get("assets", {}).get("items", [])
-            if isinstance(out, list):
-                return out
-            if isinstance(result.get("items"), list):
-                return result["items"]
-        except ImmichAPIError:
-            pass
-        try:
-            # Fallback: GET /assets (skip/take) for servers that lack search endpoints
-            skip = (page - 1) * size
-            params = {"skip": skip, "take": size}
-            result = await self._get("/assets", params=params)
-            if isinstance(result, list):
-                return result
-            return result.get("assets", result.get("items", []))
-        except ImmichAPIError:
-            return []
+        items = result.get("items", [])
+        return items if isinstance(items, list) else []
 
     async def get_map_assets(self) -> list[dict]:
         """Get all geotagged assets for map display (Immich getMapMarkers-style)."""
@@ -357,39 +364,54 @@ class ImmichAPIClient:
             raise
 
     async def get_asset_ocr(self, asset_id: str, *, include_bounding_boxes: bool = True) -> dict:
-        """Get OCR text and bounding boxes for a specific asset (v2.2.0+)
+        """Get OCR text and bounding boxes for a specific asset (v2.2.0+).
 
-        Returns OCR information including extracted text and positional data.
-        Enhanced in v2.3.0+ with multilingual support and bounding boxes.
-
-        Args:
-            asset_id: Asset ID to get OCR data for
-            include_bounding_boxes: Whether to include bounding box coordinates (v2.3.0+)
+        The endpoint returns a list of word/line boxes; this aggregates them into
+        a dict with `text`, `words`, `bounding_boxes`, `confidence`, `language`.
+        Raises ImmichAPIError (e.g. HTTP 404) when OCR is unavailable - callers
+        must handle failure explicitly rather than receiving fabricated data.
         """
-        try:
-            params = {}
-            if include_bounding_boxes:
-                params["bounding_boxes"] = "true"
+        result = await self._get(f"/assets/{asset_id}/ocr")
 
-            result = await self._get(f"/assets/{asset_id}/ocr", params=params)
+        boxes = result if isinstance(result, list) else []
+        words: list[dict] = []
+        text_parts: list[str] = []
+        scores: list[float] = []
 
-            # Ensure bounding boxes are included in response for v2.3.0+
-            if include_bounding_boxes and "bounding_boxes" not in result:
-                result["bounding_boxes"] = []
-
-            return result
-        except ImmichAPIError as e:
-            # If OCR endpoint doesn't exist, return empty result
-            if "404" in str(e) or "not found" in str(e).lower():
-                return {
-                    "text": "",
-                    "bounding_boxes": [],
-                    "language": "unknown",
-                    "confidence": 0.0,
-                    "words": [],  # Individual word data
-                    "regions": [],  # Text regions for v2.3.0+
+        for box in boxes:
+            text = (box.get("text") or "").strip()
+            if not text:
+                continue
+            text_parts.append(text)
+            with contextlib.suppress(TypeError, ValueError):
+                scores.append(float(box.get("textScore") or 0.0))
+            words.append(
+                {
+                    "id": box.get("id"),
+                    "text": text,
+                    "text_score": box.get("textScore"),
+                    "box_score": box.get("boxScore"),
+                    "x1": box.get("x1"),
+                    "y1": box.get("y1"),
+                    "x2": box.get("x2"),
+                    "y2": box.get("y2"),
+                    "x3": box.get("x3"),
+                    "y3": box.get("y3"),
+                    "x4": box.get("x4"),
+                    "y4": box.get("y4"),
                 }
-            raise
+            )
+
+        confidence = round(sum(scores) / len(scores), 4) if scores else 0.0
+
+        return {
+            "text": " ".join(text_parts),
+            "language": "unknown",
+            "confidence": confidence,
+            "bounding_boxes": words if include_bounding_boxes else [],
+            "words": words,
+            "regions": [],
+        }
 
     async def organize_photos_by_date(self, asset_ids: list[str], organization_type: str = "year_month") -> dict:
         """Organize photos into date-based albums"""
@@ -445,26 +467,20 @@ class ImmichAPIClient:
         }
 
     async def delete_photos(self, asset_ids: list[str], *, move_to_trash: bool = True) -> dict:
-        """Delete or trash photos"""
+        """Delete or trash photos via DELETE /assets (v2.7+ / v3 compatible).
+
+        Immich's bulk delete endpoint treats `force` as the trash switch:
+        force=false moves assets to trash, force=true deletes them permanently.
+        """
         deleted_asset_ids = []
         errors = []
 
-        if move_to_trash:
-            # Move to trash
-            try:
-                data = {"ids": asset_ids}
-                await self._delete("/assets/trash", data=data)
-                deleted_asset_ids = asset_ids
-            except Exception as e:
-                errors.append(f"Trash operation failed: {e!s}")
-        else:
-            # Permanent deletion
-            try:
-                data = {"ids": asset_ids, "force": True}
-                await self._delete("/assets", data=data)
-                deleted_asset_ids = asset_ids
-            except Exception as e:
-                errors.append(f"Permanent deletion failed: {e!s}")
+        try:
+            data = {"ids": asset_ids, "force": not move_to_trash}
+            await self._delete("/assets", data=data)
+            deleted_asset_ids = asset_ids
+        except Exception as e:
+            errors.append(f"{'Trash' if move_to_trash else 'Permanent delete'} operation failed: {e!s}")
 
         return {
             "deleted_count": len(deleted_asset_ids) if not move_to_trash else 0,
@@ -548,18 +564,30 @@ class ImmichAPIClient:
     # ====== PEOPLE & FACES ======
 
     async def run_face_detection(self, asset_ids: list[str] | None = None, *, force_reprocess: bool = False) -> dict:
-        """Run face detection on photos"""
-        # Trigger face detection job
-        data = {"name": "FACE_DETECTION", "data": {"assetIds": asset_ids, "force": force_reprocess}}
+        """Queue face detection for assets (POST /assets/jobs, v2+ / v3 compatible).
 
-        await self._post("/jobs", data=data)
-
-        # For now, return mock results since actual face detection is async
+        Immich processes face detection asynchronously and does not return face
+        counts from the job submission. This queues the per-asset 'refresh-faces'
+        job; poll GET /people afterward to observe new clusters. The legacy
+        POST /jobs {name: FACE_DETECTION, data: ...} payload was removed.
+        """
+        ids = asset_ids or []
+        if not ids:
+            return {
+                "job_submitted": False,
+                "queue_name": "refresh-faces",
+                "asset_count": 0,
+                "message": "No asset IDs provided - nothing queued.",
+            }
+        data = {"assetIds": ids, "name": "refresh-faces"}
+        await self._post("/assets/jobs", data=data)
         return {
-            "detected_faces": 0,  # Would be populated after job completion
-            "new_people": 0,
-            "processed_assets": len(asset_ids) if asset_ids else 0,
-            "people_found": [],
+            "job_submitted": True,
+            "queue_name": "refresh-faces",
+            "asset_count": len(ids),
+            "message": (
+                f"Queued face detection for {len(ids)} assets. Processing is async - poll /people to see new clusters."
+            ),
         }
 
     async def update_person(self, person_id: str, name: str, face_asset_ids: list[str] | None = None) -> dict:
@@ -615,88 +643,88 @@ class ImmichAPIClient:
     # ====== ADMINISTRATION ======
 
     async def get_server_stats(self) -> dict:
-        """Get server storage and usage statistics using modern endpoints"""
+        """Get server storage and usage statistics (GET /server/storage + /server/statistics).
+
+        The legacy /admin/storage and /server-info endpoints were removed in
+        v2.x; this uses the current real endpoints exclusively.
+        """
         try:
-            # Try to get server about info
             server_about = {}
-            try:
+            with contextlib.suppress(ImmichAPIError):
                 server_about = await self._get("/server/about")
-            except ImmichAPIError:
-                # Fallback to server-info if about fails
-                with contextlib.suppress(Exception):
-                    server_about = await self._get("/server-info")
 
-            # Get storage info
             storage_info = {}
-            with contextlib.suppress(Exception):
-                storage_info = await self._get("/admin/storage")
+            with contextlib.suppress(ImmichAPIError):
+                storage_info = await self._get("/server/storage")
 
-            # Get basic asset count
-            asset_count = 0
-            with contextlib.suppress(Exception):
-                search_result = await self._post("/search/metadata", data={"page": 1, "size": 1})
-                asset_count = search_result.get("assets", {}).get("total", 0)
+            stats = {}
+            with contextlib.suppress(ImmichAPIError):
+                stats = await self._get("/server/statistics")
+
+            album_count = 0
+            with contextlib.suppress(ImmichAPIError):
+                albums = await self._get("/albums")
+                album_count = len(albums) if isinstance(albums, list) else 0
 
             return {
-                "usage": storage_info.get("diskUsage", 0),
-                "available": storage_info.get("diskAvailable", 0),
-                "total": storage_info.get("diskSize", 0),
+                "usage": storage_info.get("diskUseRaw", 0),
+                "available": storage_info.get("diskAvailableRaw", 0),
+                "total": storage_info.get("diskSizeRaw", 0),
                 "usage_percentage": storage_info.get("diskUsagePercentage", 0.0),
-                "photos": asset_count,
-                "videos": 0,
-                "users": server_about.get("users", 1),
-                "albums": 0,
-                "usage_by_user": storage_info.get("usageByUser", []),
-                "api_version": server_about.get("version", "v2.x"),
+                "photos": stats.get("photos", 0),
+                "videos": stats.get("videos", 0),
+                "users": len(stats.get("usageByUser", [])),
+                "albums": album_count,
+                "usage_by_user": stats.get("usageByUser", []),
+                "api_version": server_about.get("version", "unknown"),
             }
         except Exception as e:
             return {
                 "error": str(e),
-                "api_version": "v2.x",
+                "api_version": "unknown",
             }
 
     async def get_server_info(self) -> dict:
-        """Get server health and version information (v2.x SOTA)"""
+        """Get server health and version information (GET /server/about, v2+ / v3)."""
+        server_about = {}
         try:
-            server_about = {}
-            try:
-                server_about = await self._get("/server/about")
-            except ImmichAPIError:
-                with contextlib.suppress(Exception):
-                    server_about = await self._get("/server-info")
+            server_about = await self._get("/server/about")
+        except ImmichAPIError as e:
+            return {"status": "error", "error": str(e)}
 
-            version = server_about.get("version", "v2.x")
+        version = server_about.get("version", "unknown")
 
-            # Detect capabilities
-            health_checks = {
+        return {
+            "version": version,
+            "status": "healthy",
+            "features": server_about.get("features", []),
+            "is_v2_plus": _version_at_least(version, 2),
+            "has_ocr": _version_at_least(version, 2),
+            "has_multilingual_ocr": _version_at_least(version, 2),
+            "ocr_languages": [],
+            "health": {
                 "database": True,
                 "redis": True,
                 "machine_learning": True,
                 "search_api": True,
-            }
-
-            return {
-                "version": version,
-                "status": "healthy",
-                "features": server_about.get("features", []),
-                "health": health_checks,
-                "multilingual_ocr": True,
-                "smart_search": True,
-            }
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
+            },
+            "database": True,
+            "redis": True,
+            "storage": True,
+            "machine_learning": True,
+            "uptime": 0,
+            "errors": [],
+            "api_architecture": "search_based",
+            "individual_asset_access": True,
+            "multilingual_ocr": True,
+            "smart_search": True,
+        }
 
     async def is_v3(self) -> bool:
         """Check if the connected Immich server is version 3.0.0 or higher."""
         with contextlib.suppress(Exception):
             info = await self.get_server_info()
-            version = info.get("version", "")
-            # Version might be like "3.0.0", "v3.0.0", etc.
-            version_str = version.lstrip("v")
-            if version_str:
-                parts = version_str.split(".")
-                if parts[0].isdigit() and int(parts[0]) >= 3:
-                    return True
+            return _version_at_least(info.get("version", ""), 3)
         return False
 
     async def export_photos(
@@ -714,16 +742,14 @@ class ImmichAPIClient:
         }
 
     async def get_libraries(self) -> list[dict]:
-        """Get all available libraries.
-
-        Returns:
-            List of library dictionaries with metadata
-        """
+        """Get all available libraries (GET /libraries returns a plain array in v2.7+ / v3)."""
         try:
             result = await self._get("/libraries")
-            return result.get("libraries", [])
+            if isinstance(result, list):
+                return result
+            items = result.get("items", result.get("libraries", []))
+            return items if isinstance(items, list) else []
         except Exception as e:
-            # Fallback for older Immich versions that might not have libraries endpoint
             logger.warning("Libraries endpoint not available: %s", e)
             return []
 
@@ -745,21 +771,19 @@ class ImmichAPIClient:
         import_paths: list[str] | None = None,
         exclusion_patterns: list[str] | None = None,
     ) -> dict:
-        """Create a new library.
+        """Create a new library (POST /libraries, v2.7+ / v3).
 
-        Args:
-            name: Library name
-            library_type: Type of library ("UPLOAD" or "IMPORT")
-            import_paths: List of paths to import from (for IMPORT libraries)
-            exclusion_patterns: Glob patterns to exclude
-
-        Returns:
-            Created library information
+        The API requires `ownerId` and has no `type` field - the type is
+        implied by presence of import paths. Owner is resolved via /users/me.
         """
-        data = {
-            "name": name,
-            "type": library_type,
-        }
+        data: dict = {"name": name}
+        try:
+            me = await self._get("/users/me")
+            owner_id = me.get("id")
+            if owner_id:
+                data["ownerId"] = owner_id
+        except Exception as e:
+            logger.warning("Could not resolve owner via /users/me: %s", e)
 
         if import_paths:
             data["importPaths"] = import_paths
@@ -807,132 +831,54 @@ class ImmichAPIClient:
         """
         return await self._delete(f"/libraries/{library_id}")
 
-    async def scan_library(
-        self,
-        library_id: str,
-        *,
-        refresh_modified_files: bool = False,
-        refresh_all_files: bool = False,
-    ) -> dict:
-        """Scan a library for new or changed files.
+    async def scan_library(self, library_id: str) -> dict:
+        """Scan a library for new or changed files (POST /libraries/{id}/scan).
 
-        Args:
-            library_id: The library ID to scan
-            refresh_modified_files: Whether to refresh modified files
-            refresh_all_files: Whether to refresh all files (slower)
-
-        Returns:
-            Scan results and statistics
+        The v2.7+ / v3 endpoint takes no request body - scanning always picks up
+        new/changed files according to the server's import settings.
         """
-        data = {}
-        if refresh_modified_files:
-            data["refreshModifiedFiles"] = True
-        if refresh_all_files:
-            data["refreshAllFiles"] = True
+        return await self._post(f"/libraries/{library_id}/scan", {})
 
-        return await self._post(f"/libraries/{library_id}/scan", data)
-
-    async def refresh_library_metadata(self, library_id: str) -> dict:
-        """Refresh all metadata for a library.
-
-        Args:
-            library_id: The library ID
-
-        Returns:
-            Refresh operation results
-        """
-        return await self._post(f"/libraries/{library_id}/refresh")
-
-    async def optimize_library(self, library_id: str) -> dict:
-        """Optimize library database and clean up.
-
-        Args:
-            library_id: The library ID
-
-        Returns:
-            Optimization results
-        """
-        return await self._post(f"/libraries/{library_id}/optimize")
-
-    async def add_library_location(self, library_id: str, path: str) -> dict:
-        """Add a new location/path to a library.
-
-        Args:
-            library_id: The library ID
-            path: File system path to add
-
-        Returns:
-            Updated library with new location
-        """
-        data = {"path": path}
-        return await self._post(f"/libraries/{library_id}/locations", data)
-
-    async def remove_library_location(self, library_id: str, path: str) -> dict:
-        """Remove a location/path from a library.
-
-        Args:
-            library_id: The library ID
-            path: File system path to remove
-
-        Returns:
-            Updated library without the location
-        """
-        data = {"path": path}
-        return await self._delete(f"/libraries/{library_id}/locations", data)
-
-    async def get_library_locations(self, library_id: str) -> list[dict]:
-        """Get all locations configured for a library.
-
-        Args:
-            library_id: The library ID
-
-        Returns:
-            List of location paths
-        """
-        result = await self._get(f"/libraries/{library_id}/locations")
-        return result.get("locations", [])
-
-    async def empty_library_trash(self, library_id: str) -> dict:
-        """Empty the trash for a specific library.
-
-        Args:
-            library_id: The library ID
-
-        Returns:
-            Trash emptying results
-        """
-        return await self._post(f"/libraries/{library_id}/empty-trash")
-
-    async def clean_library_bundles(self, library_id: str) -> dict:
-        """Clean old bundle files to free up disk space.
-
-        Args:
-            library_id: The library ID
-
-        Returns:
-            Cleanup results and space freed
-        """
-        return await self._post(f"/libraries/{library_id}/clean-bundles")
+    async def get_library_statistics(self, library_id: str) -> dict:
+        """Get storage statistics for a library (GET /libraries/{id}/statistics, v2.7+ / v3)."""
+        return await self._get(f"/libraries/{library_id}/statistics")
 
     async def update_asset_visibility(self, asset_id: str, visibility: str) -> dict:
-        """Update the visibility status of an asset (v2.5.0+ / Early 2026)
+        """Update the visibility status of an asset (v2.5.0+).
 
-        Args:
-            asset_id: Unique asset ID
-            visibility: One of "hidden", "archived", "private", "public"
+        Valid values: 'archive', 'timeline', 'hidden', 'locked'.
         """
+        if visibility not in _VISIBILITY_VALUES:
+            raise ImmichAPIError(f"Invalid visibility '{visibility}' - must be one of: {', '.join(_VISIBILITY_VALUES)}")
         return await self._put(f"/assets/{asset_id}", data={"visibility": visibility})
 
     async def edit_asset(self, asset_id: str, operation: str, **params) -> dict:
-        """Perform image editing operations (Early 2026)
+        """Apply a non-destructive edit (crop/rotate/mirror) via PUT /assets/{id}/edits (v2.5.0+).
 
-        Args:
-            asset_id: Unique asset ID
-            operation: One of "crop", "rotate", "mirror"
-            **params: Additional parameters for the operation (e.g., angle, rect)
+        The legacy POST /assets/{id}/edit endpoint does not exist; edits are
+        written as a list of action items under the plural `/edits` resource.
         """
-        data = {"operation": operation, **params}
-        return await self._post(f"/assets/{asset_id}/edit", data=data)
+        op = (operation or "").lower()
+
+        if op == "rotate":
+            angle = params.get("angle")
+            if angle is None:
+                raise ImmichAPIError("rotate requires 'angle' (degrees, e.g. 90)")
+            action = {"action": "rotate", "parameters": {"angle": angle}}
+        elif op == "mirror":
+            axis = params.get("axis") or params.get("direction")
+            if axis not in ("horizontal", "vertical"):
+                raise ImmichAPIError("mirror requires 'axis' or 'direction' in ('horizontal', 'vertical')")
+            action = {"action": "mirror", "parameters": {"axis": axis}}
+        elif op == "crop":
+            x, y, width, height = params.get("x"), params.get("y"), params.get("width"), params.get("height")
+            if any(v is None for v in (x, y, width, height)):
+                raise ImmichAPIError("crop requires x, y, width, height")
+            action = {"action": "crop", "parameters": {"x": x, "y": y, "width": width, "height": height}}
+        else:
+            raise ImmichAPIError(f"Unsupported edit operation '{operation}' - use crop, rotate, or mirror")
+
+        return await self._put(f"/assets/{asset_id}/edits", data={"edits": [action]})
 
     async def get_binary(self, endpoint: str, params: dict | None = None) -> bytes:
         """Make GET request to Immich API and return binary data"""

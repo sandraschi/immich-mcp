@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.2",
   "name": "immich-mcp",
-  "version": "1.2.0",
+  "version": "1.6.1",
   "description": "Austrian efficiency for Immich photo management with FastMCP 2.11+. 25+ tools including library management (external folders), multi-user support, and v2.4.0+ compatibility. Search photos with AI, OCR in 12+ languages.",
   "author": {
     "name": "sandraschi",

@@ -354,13 +354,12 @@ class ShareResult(BaseModel):
 
 
 class PeopleDetectionResult(BaseModel):
-    """Face detection operation result"""
+    """Face detection job submission result"""
 
-    detected_faces: int = Field(description="Number of faces detected")
-    new_people: int = Field(description="Number of new person clusters")
-    processed_assets: int = Field(description="Number of photos processed")
-    processing_time_seconds: float = Field(description="Detection processing time")
-    people_found: list[dict[str, Any]] = Field(description="List of detected people clusters")
+    job_submitted: bool = Field(description="Whether the face detection job was queued")
+    queue_name: str = Field(description="Immich job queue used (refresh-faces)")
+    asset_count: int = Field(description="Number of photos queued for processing")
+    message: str = Field(description="Human-readable status including how to observe results")
 
 
 class PersonInfo(BaseModel):
@@ -834,14 +833,14 @@ async def search_photos(
 
 @mcp.tool()
 async def update_asset_visibility(asset_id: str, visibility: str) -> dict:
-    """Update visibility status of a photo or video (v2.5.0+ / Early 2026).
+    """Update visibility status of a photo or video (v2.5.0+).
 
-    Visibility options: 'hidden', 'archived', 'private', 'public'.
-    Required for advanced asset categorization and privacy management.
+    Visibility options: 'archive' (in archive), 'timeline' (normal),
+    'hidden' (hidden from timeline), 'locked' (protected from deletion).
 
     Parameters:
         asset_id (str, REQUIRED): Unique identifier of the asset.
-        visibility (str, REQUIRED): Target visibility state ("hidden", "archived", "private", "public").
+        visibility (str, REQUIRED): One of 'archive', 'timeline', 'hidden', 'locked'.
 
     Returns:
         Dict with success status and descriptive message.
@@ -870,14 +869,15 @@ async def edit_photo(
     width: int | None = None,
     height: int | None = None,
 ) -> dict:
-    """Perform basic image editing: crop, rotate, or mirror (Early 2026).
+    """Perform basic image editing: crop, rotate, or mirror (v2.5.0+).
 
-    Supports non-destructive edits using Immich's native image processor.
+    Writes non-destructive edits via PUT /assets/{id}/edits using Immich's
+    native image processor.
 
     Operations:
-        - rotate: params={angle: 90 | 180 | 270}
-        - mirror: params={direction: 'horizontal' | 'vertical'}
-        - crop: params={x: int, y: int, width: int, height: int}
+        - rotate: angle=90 | 180 | 270
+        - mirror: direction='horizontal' | 'vertical'
+        - crop: x, y, width, height
 
     Parameters:
         asset_id (str, REQUIRED): Unique identifier of the asset.
@@ -1889,54 +1889,49 @@ async def share_album(
 
 @mcp.tool()
 async def detect_people(asset_ids: list[str] | None = None, *, force_reprocess: bool = False) -> PeopleDetectionResult:
-    r"""Run face detection on photos and return clustering results.
+    r"""Queue face detection for photos (v2.4+ / v3).
+
+    Submits the per-asset 'refresh-faces' job via POST /assets/jobs. Immich
+    processes face detection asynchronously - this tool reports the job
+    submission; poll tag_person/search results (GET /people) afterward to
+    see new person clusters.
 
     Parameters:
         asset_ids (List[str], OPTIONAL):
             Specific photos to process.
             Format: ["id1", "id2", "id3"]
-            When None: Processes all unprocessed photos in library.
-            Default: None
+            When None: Nothing is queued (the API requires explicit asset IDs).
 
         force_reprocess (bool, OPTIONAL):
-            Whether to re-detect faces even if already processed.
-            When True: Re-processes all specified photos.
-            When False: Skips photos that already have face detection.
-            Default: False
+            Accepted for compatibility; the v2.7+ / v3 job API always refreshes
+            faces for the given assets.
 
     Returns:
         PeopleDetectionResult containing:
-            - detected_faces (int): Number of faces detected
-            - new_people (int): Number of new people clusters created
-            - processed_assets (int): Number of photos processed
-            - processing_time_seconds (float): Time taken for processing
-            - people_found (List[Dict]): List of detected people with metadata
+            - job_submitted (bool): Whether the job was queued
+            - queue_name (str): The Immich queue used ("refresh-faces")
+            - asset_count (int): Number of photos queued
+            - message (str): Status and how to observe results
     """
     try:
-        start_time = asyncio.get_event_loop().time()
         client = await get_api_client()
 
         result = await client.run_face_detection(asset_ids=asset_ids, force_reprocess=force_reprocess)
 
-        end_time = asyncio.get_event_loop().time()
-        processing_time = end_time - start_time
-
         return PeopleDetectionResult(
-            detected_faces=result.get("detected_faces", 0),
-            new_people=result.get("new_people", 0),
-            processed_assets=result.get("processed_assets", 0),
-            processing_time_seconds=processing_time,
-            people_found=result.get("people_found", []),
+            job_submitted=result.get("job_submitted", False),
+            queue_name=result.get("queue_name", "refresh-faces"),
+            asset_count=result.get("asset_count", 0),
+            message=result.get("message", ""),
         )
 
     except ImmichAPIError as e:
         logger.error("Immich API error in detect_people: %s", e)
         return PeopleDetectionResult(
-            detected_faces=0,
-            new_people=0,
-            processed_assets=0,
-            processing_time_seconds=0.0,
-            people_found=[],
+            job_submitted=False,
+            queue_name="refresh-faces",
+            asset_count=0,
+            message=f"Failed to queue face detection: {e}",
         )
 
 
@@ -2327,14 +2322,6 @@ async def get_library_info(library_id: str) -> dict:
     try:
         client = await get_api_client()
         library_info = await client.get_library_info(library_id)
-
-        # Get additional location details
-        try:
-            locations = await client.get_library_locations(library_id)
-            library_info["locations"] = locations
-        except Exception:
-            library_info["locations"] = []
-
         return library_info
     except Exception as e:
         logger.error(f"Failed to get library info for {library_id}: {e}")
@@ -2403,7 +2390,7 @@ async def create_library(
 
 
 @mcp.tool()
-async def scan_library(library_id: str, refresh_modified_files: bool = False, refresh_all_files: bool = False) -> dict:
+async def scan_library(library_id: str) -> dict:
     """Scan a library for new or changed photos from external folders.
 
     This is the key solution to 'unwieldy external folder management' - instead
@@ -2412,8 +2399,6 @@ async def scan_library(library_id: str, refresh_modified_files: bool = False, re
 
     Args:
         library_id: The library ID to scan
-        refresh_modified_files: Also refresh metadata for modified files (slower)
-        refresh_all_files: Refresh all files regardless of modification date (slowest)
 
     Returns:
         Scan results with statistics on discovered and imported photos
@@ -2426,29 +2411,17 @@ async def scan_library(library_id: str, refresh_modified_files: bool = False, re
         # Get library info first for context
         library_info = await client.get_library_info(library_id)
 
-        # Perform the scan
-        scan_result = await client.scan_library(
-            library_id=library_id,
-            refresh_modified_files=refresh_modified_files,
-            refresh_all_files=refresh_all_files,
-        )
-
-        # Calculate scan scope
-        scope = "new files only"
-        if refresh_modified_files:
-            scope = "new and modified files"
-        if refresh_all_files:
-            scope = "all files (full refresh)"
+        # Perform the scan (v2.7+ / v3 endpoint takes no body)
+        scan_result = await client.scan_library(library_id)
 
         return {
             "success": True,
             "library_name": library_info.get("name", "Unknown"),
-            "scan_scope": scope,
+            "scan_scope": "new and modified files (server import settings)",
             "scan_result": scan_result,
-            "message": f"Library scan completed for {scope}",
+            "message": f"Library scan completed for {library_info.get('name', library_id)}",
             "tips": [
-                "Use refresh_modified_files for regular updates",
-                "Use refresh_all_files for initial setup or major changes",
+                "Run scan_library regularly to pick up new files",
                 "Check scan results for any import errors",
             ],
         }
@@ -2462,103 +2435,6 @@ async def scan_library(library_id: str, refresh_modified_files: bool = False, re
 
 
 @mcp.tool()
-async def add_library_location(library_id: str, path: str) -> dict:
-    """Add a new external folder path to an Immich library.
-
-    This directly addresses the 'unwieldy external folder management' issue by
-    allowing you to easily add new photo folders to your library organization.
-    No more manual folder management - just add the path and scan.
-
-    Args:
-        library_id: The library ID to add the location to
-        path: Full file system path to add (e.g., "D:\\Photos\\Vacation")
-
-    Returns:
-        Updated library configuration with new location
-
-    Austrian efficiency: Simple external folder integration.
-    """
-    try:
-        client = await get_api_client()
-
-        # Validate path exists
-        if not Path(path).exists():
-            return {
-                "error": f"Path does not exist: {path}",
-                "suggestion": "Verify the path is correct and accessible",
-            }
-
-        # Add the location
-        result = await client.add_library_location(library_id, path)
-
-        # Get updated library info
-        library_info = await client.get_library_info(library_id)
-
-        return {
-            "success": True,
-            "library_name": library_info.get("name", "Unknown"),
-            "new_location": path,
-            "total_locations": len(library_info.get("importPaths", [])),
-            "result": result,
-            "message": f"Added location '{path}' to library",
-            "next_steps": [
-                "Run scan_library to import photos from new location",
-                "Configure exclusion patterns if needed",
-            ],
-        }
-    except Exception as e:
-        logger.error(f"Failed to add location {path} to library {library_id}: {e}")
-        return {
-            "error": str(e),
-            "library_id": library_id,
-            "path": path,
-            "suggestion": "Check library permissions and path accessibility",
-        }
-
-
-@mcp.tool()
-async def remove_library_location(library_id: str, path: str) -> dict:
-    """Remove an external folder path from an Immich library.
-
-    Clean up your library organization by removing folders that are no longer
-    needed. This helps maintain tidy library configurations.
-
-    Args:
-        library_id: The library ID to remove the location from
-        path: Full file system path to remove
-
-    Returns:
-        Updated library configuration without the removed location
-    """
-    try:
-        client = await get_api_client()
-
-        # Remove the location
-        result = await client.remove_library_location(library_id, path)
-
-        # Get updated library info
-        library_info = await client.get_library_info(library_id)
-
-        return {
-            "success": True,
-            "library_name": library_info.get("name", "Unknown"),
-            "removed_location": path,
-            "remaining_locations": len(library_info.get("importPaths", [])),
-            "result": result,
-            "message": f"Removed location '{path}' from library",
-            "warning": "Photos from this location may still exist in the library",
-        }
-    except Exception as e:
-        logger.error(f"Failed to remove location {path} from library {library_id}: {e}")
-        return {
-            "error": str(e),
-            "library_id": library_id,
-            "path": path,
-            "suggestion": "Verify the location exists in the library",
-        }
-
-
-@mcp.tool()
 async def manage_library(
     library_id: str,
     action: str,
@@ -2566,20 +2442,13 @@ async def manage_library(
     import_paths: list[str] | None = None,
     exclusion_patterns: list[str] | None = None,
 ) -> dict:
-    """Perform various management actions on an Immich library.
-
-    Comprehensive library management including updates, optimization, cleanup,
-    and maintenance operations. This provides the control needed for managing
-    external photo folder imports effectively.
+    """Perform management actions on an Immich library.
 
     Args:
         library_id: The library ID to manage
         action: Management action to perform:
-            - "update": Update library configuration
-            - "refresh": Refresh all metadata
-            - "optimize": Optimize database performance
-            - "empty_trash": Remove deleted items permanently
-            - "clean_bundles": Remove old bundle files to free space
+            - "update": Update library configuration (name, import_paths, exclusion_patterns)
+            - "statistics": Get storage statistics for the library (photos/videos/usage)
         name: New library name (for update action)
         import_paths: Updated import paths (for update action)
         exclusion_patterns: Updated exclusion patterns (for update action)
@@ -2611,31 +2480,16 @@ async def manage_library(
             )
             message = f"Updated library '{library_name}' configuration"
 
-        elif action == "refresh":
-            result = await client.refresh_library_metadata(library_id)
-            message = f"Refreshed metadata for library '{library_name}'"
-
-        elif action == "optimize":
-            result = await client.optimize_library(library_id)
-            message = f"Optimized database for library '{library_name}'"
-
-        elif action == "empty_trash":
-            result = await client.empty_library_trash(library_id)
-            message = f"Emptied trash for library '{library_name}'"
-
-        elif action == "clean_bundles":
-            result = await client.clean_library_bundles(library_id)
-            message = f"Cleaned bundles for library '{library_name}'"
+        elif action == "statistics":
+            result = await client.get_library_statistics(library_id)
+            message = f"Retrieved statistics for library '{library_name}'"
 
         else:
             return {
                 "error": f"Unknown action: {action}",
                 "available_actions": [
                     "update",
-                    "refresh",
-                    "optimize",
-                    "empty_trash",
-                    "clean_bundles",
+                    "statistics",
                 ],
             }
 

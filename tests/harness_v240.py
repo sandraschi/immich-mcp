@@ -113,9 +113,9 @@ class TestHarness:
 
     async def test_search_endpoints(self):
         """Test search endpoint functionality"""
-        # Test search/metadata endpoint
+        # Test search/metadata endpoint (POST only in v2.7+/v3)
         try:
-            result = await self.api_client._get("/search/metadata", params={"page": 1, "size": 10, "type": "ASSET"})
+            result = await self.api_client._post("/search/metadata", data={"page": 1, "size": 10})
 
             if "assets" in result and "items" in result["assets"]:
                 self.record_test(
@@ -142,41 +142,39 @@ class TestHarness:
             self.record_test("filename_search", False, f"Filename search failed: {e}")
 
     async def test_asset_access(self):
-        """Test asset access limitations and fallbacks"""
-        # Test individual asset access (should fail in v2.4.0)
+        """Test asset access and retrieval (GET /assets/{id} works since v2.4)"""
+        # Test individual asset access
         try:
             assets = await self.api_client.search_photos("", search_type="filename", limit=1)
             if assets:
                 asset_id = assets[0]["id"]
                 try:
-                    await self.api_client._get(f"/assets/{asset_id}")
-                    self.record_test(
-                        "individual_asset_access", False, "Individual asset access should be blocked in v2.4.0"
-                    )
-                except ImmichAPIError as e:
-                    if "404" in str(e) or "not found" in str(e).lower():
-                        self.record_test("individual_asset_access", True, "Individual asset access correctly blocked")
+                    asset_info = await self.api_client._get(f"/assets/{asset_id}")
+                    if asset_info.get("id") == asset_id:
+                        self.record_test("individual_asset_access", True, "Individual asset access works")
                     else:
-                        self.record_test("individual_asset_access", False, f"Unexpected error: {e}")
+                        self.record_test("individual_asset_access", False, "Asset access returned wrong asset")
+                except ImmichAPIError as e:
+                    self.record_test("individual_asset_access", False, f"Asset access failed: {e}")
             else:
                 self.record_test("individual_asset_access", True, "No assets to test (expected in empty library)")
         except Exception as e:
             self.record_test("individual_asset_access", False, f"Asset access test failed: {e}")
 
-        # Test get_asset_info fallback
+        # Test get_asset_info
         try:
             assets = await self.api_client.search_photos("", search_type="filename", limit=1)
             if assets:
                 asset_id = assets[0]["id"]
                 asset_info = await self.api_client.get_asset_info(asset_id)
                 if asset_info["id"] == asset_id:
-                    self.record_test("asset_info_fallback", True, "Asset info fallback works correctly")
+                    self.record_test("asset_info_fallback", True, "Asset info retrieval works correctly")
                 else:
-                    self.record_test("asset_info_fallback", False, "Asset info fallback returned wrong asset")
+                    self.record_test("asset_info_fallback", False, "Asset info retrieval returned wrong asset")
             else:
                 self.record_test("asset_info_fallback", True, "No assets to test (expected in empty library)")
         except Exception as e:
-            self.record_test("asset_info_fallback", False, f"Asset info fallback failed: {e}")
+            self.record_test("asset_info_fallback", False, f"Asset info retrieval failed: {e}")
 
     async def test_server_info(self):
         """Test server info adaptation"""
@@ -187,7 +185,7 @@ class TestHarness:
                 "version_detection": "version" in server_info,
                 "v2_plus_detection": server_info.get("is_v2_plus") is True,
                 "api_architecture": server_info.get("api_architecture") == "search_based",
-                "individual_access_flag": server_info.get("individual_asset_access") is False,
+                "individual_access_flag": server_info.get("individual_asset_access") is True,
             }
 
             passed_checks = sum(checks.values())
@@ -208,10 +206,10 @@ class TestHarness:
         try:
             server_stats = await self.api_client.get_server_stats()
 
-            if server_stats.get("api_version") == "2.4.0+":
-                self.record_test("server_stats_adaptation", True, "Server stats adapted for v2.4.0")
+            if server_stats.get("api_version") != "unknown":
+                self.record_test("server_stats_adaptation", True, "Server stats retrieved from real endpoints")
             else:
-                self.record_test("server_stats_adaptation", False, "Server stats not adapted for v2.4.0")
+                self.record_test("server_stats_adaptation", False, "Server stats not retrieved")
 
         except Exception as e:
             self.record_test("server_stats_adaptation", False, f"Server stats test failed: {e}")
