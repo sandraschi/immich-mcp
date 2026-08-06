@@ -174,7 +174,7 @@ export function Chat() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-indigo-400" />
-            Immich AI Assistant
+            AI Chat
           </h2>
           <p className="text-slate-400">Natural language photo management and search</p>
         </div>

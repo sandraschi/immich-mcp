@@ -215,6 +215,14 @@ _web_app = FastAPI(
 _web_app.include_router(v1_router, prefix="/api/v1")
 _web_app.mount("/mcp", mcp.http_app(path="/"))
 
+# Capture log lines into the in-memory ring buffer for the /api/v1/logs endpoint.
+try:
+    from .logs import install_log_capture
+
+    install_log_capture()
+except Exception:
+    pass
+
 # Expose for uvicorn (e.g. web_sota/start.ps1)
 app = _web_app
 

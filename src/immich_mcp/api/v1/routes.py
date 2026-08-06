@@ -24,19 +24,78 @@ class ChatRequest(BaseModel):
     model: str = "llama3.3"
 
 
+_PROVIDER_BASES = {
+    "ollama": "http://localhost:11434/v1",
+    "lm-studio": "http://localhost:1234/v1",
+    "openrouter": "https://openrouter.ai/api/v1",
+}
+
+_CHAT_SYSTEM_PROMPT = (
+    "You are the Immich photo library assistant. You help with photo organization, "
+    "searching, albums, metadata, people/faces, and library management for the user's "
+    "Immich server (photo library). Answer concisely and practically. If a task requires "
+    "specific photo data, explain what the user can do in the app or ask for the photo/album "
+    "details you need."
+)
+
+
 @router.post("/chat")
 async def chat_with_immich(request: ChatRequest):
-    """Handle chat requests from the webapp."""
-    # For now, this is a bridge to the conversational_immich_assistant logic
-    # or a direct call to a local LLM if configured.
-    return {
-        "success": True,
-        "response": (
-            f"I received your message: '{request.message}'. "
-            f"I'm currently being industrialized to support direct {request.provider} ({request.model}) interaction."
-        ),
-        "debug": {"provider": request.provider, "model": request.model},
+    """Handle chat requests from the webapp by calling the selected LLM provider."""
+    base = _PROVIDER_BASES.get(request.provider)
+    if not base:
+        return {
+            "success": False,
+            "error": f"Unknown provider '{request.provider}'",
+            "suggestions": ["Use 'ollama' or 'lm-studio'"],
+        }
+    url = f"{base}/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    if request.provider == "openrouter":
+        api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        if not api_key:
+            return {
+                "success": False,
+                "error": "OPENROUTER_API_KEY not set in .env",
+                "suggestions": ["Set OPENROUTER_API_KEY or switch to a local provider"],
+            }
+        headers["Authorization"] = f"Bearer {api_key}"
+    payload = {
+        "model": request.model,
+        "messages": [
+            {"role": "system", "content": _CHAT_SYSTEM_PROMPT},
+            {"role": "user", "content": request.message},
+        ],
+        "temperature": 0.3,
+        "max_tokens": 512,
     }
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=5.0)) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+        return {"success": True, "response": content, "debug": {"provider": request.provider, "model": request.model}}
+    except httpx.HTTPStatusError as e:
+        return {
+            "success": False,
+            "error": f"Provider returned HTTP {e.response.status_code}",
+            "suggestions": ["Check that the model name exists on the provider", "Try a different model"],
+        }
+    except httpx.ConnectError:
+        return {
+            "success": False,
+            "error": f"Cannot reach {request.provider} at {base}. Is the local LLM running?",
+            "suggestions": ["Start Ollama or LM Studio", "Check the provider URL in Settings"],
+        }
+    except (httpx.TimeoutException, httpx.ReadTimeout):
+        return {
+            "success": False,
+            "error": f"{request.provider} timed out generating a response.",
+            "suggestions": ["Use a smaller/faster model", "Try again"],
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 @router.get("/health")
@@ -545,17 +604,13 @@ async def list_mcp_tools():
 
 
 @router.get("/logs")
-async def get_logs(limit: int = 100):
-    """Retrieve system logs for the dashboard.
-    For now, returns a combination of memory logs and recent file-based logs.
-    """
+async def get_logs(limit: int = 200):
+    """Retrieve recent server logs from the in-memory ring buffer."""
     try:
-        log_file = "server_output.log"
-        if os.path.exists(log_file):
-            with open(log_file) as f:
-                content = f.readlines()
-                return {"success": True, "logs": content[-limit:]}
-        return {"success": True, "logs": ["Server running. No log file found at root."]}
+        from ...logs import get_recent_logs, install_log_capture
+
+        install_log_capture()
+        return {"success": True, "logs": get_recent_logs(limit)}
     except Exception as e:
         return {"success": False, "error": str(e), "logs": []}
 
@@ -585,12 +640,35 @@ async def get_llm_models(provider: str = "ollama"):
                     models = [m["name"] for m in data.get("models", [])]
                     return {"success": True, "models": models}
         except Exception:
-            return {"success": True, "models": ["llama3.3", "mistral", "phi3"]}  # Fallback defaults
+            return {
+                "success": False,
+                "error": "Cannot reach Ollama at http://localhost:11434. Is it running?",
+                "models": [],
+            }
 
     if provider == "openrouter":
-        return {"success": True, "models": ["anthropic/claude-3-sonnet", "google/gemini-pro-1.5"]}
+        return {
+            "success": False,
+            "error": "OpenRouter model list requires the OPENROUTER_API_KEY. Set it in .env.",
+            "models": [],
+        }
 
-    return {"success": True, "models": ["default-model"]}
+    if provider == "lm-studio":
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get("http://localhost:1234/v1/models", timeout=2.0)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    models = [m["id"] for m in data.get("data", [])]
+                    return {"success": True, "models": models}
+        except Exception:
+            return {
+                "success": False,
+                "error": "Cannot reach LM Studio at http://localhost:1234. Is it running?",
+                "models": [],
+            }
+
+    return {"success": False, "error": f"Unknown provider '{provider}'", "models": []}
 
 
 # Static help content for webapp (no MCP tool dependency)

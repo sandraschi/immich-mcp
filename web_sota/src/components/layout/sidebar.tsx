@@ -29,7 +29,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { href: "/people", label: "People", icon: Users },
     { href: "/map", label: "Map View", icon: MapIcon },
     { href: "/libraries", label: "Libraries", icon: FolderOpen },
-    { href: "/chat", label: "AI Command", icon: Bot },
+    { href: "/chat", label: "AI Chat", icon: Bot },
     { href: "/tools", label: "Tools", icon: Wrench },
     { href: "/logger", label: "System Logs", icon: Terminal },
     { href: "/help", label: "Help", icon: HelpCircle },
