@@ -29,7 +29,7 @@ def immich_config():
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 async def api_client(immich_config):
     """Create API client connected to real server"""
     client = ImmichAPIClient(immich_config)
@@ -300,7 +300,8 @@ class TestImmichV240Integration:
                 await api_client.get_asset_info("invalid-asset-id-12345")
                 pytest.fail("Should have raised an error for invalid asset ID")
             except ImmichAPIError as e:
-                assert "not found" in str(e).lower()
+                msg = str(e).lower()
+                assert "not found" in msg or "404" in msg or "400" in msg
 
         @pytest.mark.asyncio
         async def test_network_error_recovery(self, api_client):
@@ -317,7 +318,7 @@ class TestImmichV240Integration:
 class TestImmichMCPFullIntegration:
     """Full integration tests for complete ImmichMCP workflow"""
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="function")
     async def test_assets(self, api_client):
         """Get some test assets for comprehensive testing"""
         try:

@@ -3,10 +3,11 @@ import {
   Bot,
   ChevronLeft,
   ChevronRight,
+  FolderOpen,
   HelpCircle,
   Image,
   LayoutDashboard,
-  Map,
+  Map as MapIcon,
   Settings,
   Terminal,
   Users,
@@ -26,7 +27,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { href: "/photos", label: "Photos", icon: Image },
     { href: "/albums", label: "Albums", icon: Image },
     { href: "/people", label: "People", icon: Users },
-    { href: "/map", label: "Map View", icon: Map },
+    { href: "/map", label: "Map View", icon: MapIcon },
+    { href: "/libraries", label: "Libraries", icon: FolderOpen },
     { href: "/chat", label: "AI Command", icon: Bot },
     { href: "/tools", label: "Tools", icon: Wrench },
     { href: "/logger", label: "System Logs", icon: Terminal },
@@ -79,6 +81,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       <div className="border-t border-slate-800 p-2">
         <button
+          type="button"
           onClick={onToggle}
           className="flex w-full items-center justify-center rounded-md p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
         >

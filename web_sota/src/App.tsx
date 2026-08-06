@@ -3,8 +3,9 @@ import { Albums } from "@/pages/albums";
 import { Chat } from "@/pages/chat";
 import { Dashboard } from "@/pages/dashboard";
 import { Help } from "@/pages/help";
+import { Libraries } from "@/pages/libraries";
 import { Logger } from "@/pages/logger";
-import { Map } from "@/pages/map";
+import { Map as MapPage } from "@/pages/map";
 import { People } from "@/pages/people";
 import { Photos } from "@/pages/photos";
 import { Settings } from "@/pages/settings";
@@ -20,7 +21,8 @@ function App() {
           <Route path="/photos" element={<Photos />} />
           <Route path="/albums" element={<Albums />} />
           <Route path="/people" element={<People />} />
-          <Route path="/map" element={<Map />} />
+          <Route path="/map" element={<MapPage />} />
+          <Route path="/libraries" element={<Libraries />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/tools" element={<Tools />} />
           <Route path="/logger" element={<Logger />} />

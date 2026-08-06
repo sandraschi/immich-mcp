@@ -133,6 +133,8 @@ class ImmichAPIClient:
             else:
                 response = await self.client.post(url, json=data)
             response.raise_for_status()
+            if response.status_code == 204 or not response.content:
+                return {"success": True}
             return response.json()
         except httpx.HTTPStatusError as e:
             # Enhanced error handling for v2.0.0+ API responses

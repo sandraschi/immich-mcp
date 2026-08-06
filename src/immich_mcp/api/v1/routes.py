@@ -336,7 +336,7 @@ async def list_albums(
     try:
         from ...server import list_albums as list_tool
 
-        return await list_tool(shared, include_stats)
+        return await list_tool(shared=shared, include_stats=include_stats)
     except ImmichAPIError as e:
         raise _immich_error_to_http(e) from e
     except (httpx.ConnectError, httpx.TimeoutException) as e:
@@ -657,5 +657,108 @@ async def get_mcp_help(category: str | None = None):
             "categories": list(HELP_CONTENT.keys()),
             "all_help": HELP_CONTENT,
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/libraries")
+async def list_libraries(client: ImmichAPIClient = Depends(get_api_client)):
+    """List external libraries with import paths, refresh status, and stats."""
+    try:
+        from ...server import mcp
+
+        if not mcp.immich_client:
+            raise HTTPException(
+                status_code=503,
+                detail="Immich client not initialized. Check .env (IMMICH_SERVER_URL, IMMICH_API_KEY) and restart the backend.",
+            )
+        libraries = await mcp.immich_client.get_libraries()
+        out = []
+        for lib in libraries:
+            stats = {}
+            try:
+                stats = await mcp.immich_client.get_library_statistics(lib.get("id", "")) or {}
+            except Exception:
+                stats = {}
+            out.append(
+                {
+                    "id": lib.get("id", ""),
+                    "name": lib.get("name", "Unnamed library"),
+                    "type": lib.get("type", "EXTERNAL"),
+                    "import_paths": lib.get("importPaths", []),
+                    "exclusion_patterns": lib.get("exclusionPatterns", []),
+                    "refreshed_at": lib.get("refreshedAt"),
+                    "created_at": lib.get("createdAt"),
+                    "asset_count": int(stats.get("total", 0) or 0),
+                    "photo_count": int(stats.get("photos", 0) or 0),
+                    "video_count": int(stats.get("videos", 0) or 0),
+                    "size_bytes": int(stats.get("usage", 0) or 0),
+                }
+            )
+        return out
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Cannot reach Immich server. Check IMMICH_SERVER_URL in .env and that Immich is running.",
+        ) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/libraries/{library_id}/scan")
+async def scan_library(library_id: str, client: ImmichAPIClient = Depends(get_api_client)):
+    """Trigger a scan of an external library (picks up new/changed files)."""
+    try:
+        from ...server import mcp
+
+        if not mcp.immich_client:
+            raise HTTPException(
+                status_code=503,
+                detail="Immich client not initialized. Check .env (IMMICH_SERVER_URL, IMMICH_API_KEY) and restart the backend.",
+            )
+        await mcp.immich_client.scan_library(library_id)
+        return {"success": True, "message": f"Scan triggered for library {library_id}", "library_id": library_id}
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        raise HTTPException(status_code=503, detail="Cannot reach Immich server.") from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.delete("/libraries/{library_id}")
+async def delete_library(library_id: str, client: ImmichAPIClient = Depends(get_api_client)):
+    """Delete a library (only safe when it has no import paths / assets)."""
+    try:
+        from ...server import mcp
+
+        if not mcp.immich_client:
+            raise HTTPException(
+                status_code=503,
+                detail="Immich client not initialized. Check .env (IMMICH_SERVER_URL, IMMICH_API_KEY) and restart the backend.",
+            )
+        await mcp.immich_client.delete_library(library_id)
+        return {"success": True, "message": f"Library {library_id} deleted", "library_id": library_id}
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        raise HTTPException(status_code=503, detail="Cannot reach Immich server.") from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/libraries/{library_id}/statistics")
+async def library_statistics(library_id: str, client: ImmichAPIClient = Depends(get_api_client)):
+    """Storage statistics for one library."""
+    try:
+        from ...server import mcp
+
+        if not mcp.immich_client:
+            raise HTTPException(status_code=503, detail="Immich client not initialized.")
+        return await mcp.immich_client.get_library_statistics(library_id)
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
