@@ -974,3 +974,93 @@ async def diagnostics():
         },
         "errors": [],
     }
+
+
+# ===== LIBRARY RECONCILIATION (iCloud / local-folder consolidation) =====
+
+
+class ReconcileFolderRequest(BaseModel):
+    folder: str
+    extensions: list[str] | None = None
+    report_path: str | None = None
+
+
+class ReconcileImportRequest(BaseModel):
+    folder: str | None = None
+    album_name: str | None = None
+    force: bool = False
+    statuses: list[str] | None = None
+
+
+class ReconcileSimilarRequest(BaseModel):
+    folder: str | None = None
+    threshold: int = 8
+    limit: int = 5000
+
+
+@router.post("/reconcile/scan")
+async def reconcile_scan(request: ReconcileFolderRequest):
+    """Scan a local folder without touching Immich (manifest + local dupes)."""
+    from ... import reconcile as reconcile_engine
+
+    result = reconcile_engine.run_scan(request.folder, extensions=_norm_exts(request.extensions))
+    return {"success": True, **result}
+
+
+@router.post("/reconcile/compare")
+async def reconcile_compare(request: ReconcileFolderRequest, client: ImmichAPIClient = Depends(get_api_client)):
+    """Scan a folder and classify every file against the Immich library."""
+    from ... import reconcile as reconcile_engine
+
+    try:
+        result = await reconcile_engine.run_compare(
+            client, request.folder, extensions=_norm_exts(request.extensions), report_path=request.report_path
+        )
+        return {"success": True, **result}
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/reconcile/similar")
+async def reconcile_similar(request: ReconcileSimilarRequest):
+    """Perceptual similar-image clusters over the last compare (or a fresh scan)."""
+    from ... import reconcile as reconcile_engine
+
+    result = reconcile_engine.run_similar(threshold=request.threshold, limit=request.limit, folder=request.folder)
+    return {"success": True, **result}
+
+
+@router.post("/reconcile/import")
+async def reconcile_import(request: ReconcileImportRequest, client: ImmichAPIClient = Depends(get_api_client)):
+    """Import classified-new files from the last compare, preserving Live Photo pairs."""
+    from ... import reconcile as reconcile_engine
+
+    if request.folder and request.folder != reconcile_engine.LAST_FOLDER:
+        await reconcile_engine.run_compare(client, request.folder)
+    result = await reconcile_engine.run_import(
+        client, album_name=request.album_name, force=request.force, statuses=request.statuses
+    )
+    return result
+
+
+@router.get("/reconcile/status")
+async def reconcile_status():
+    """Current reconciliation state (folder, summary, report path)."""
+    from ... import reconcile as reconcile_engine
+
+    return {
+        "success": True,
+        "folder": reconcile_engine.LAST_FOLDER,
+        "summary": reconcile_engine.LAST_SUMMARY,
+        "checksum_algorithm": reconcile_engine.LAST_ALGORITHM,
+        "report_path": reconcile_engine.LAST_REPORT_PATH,
+    }
+
+
+def _norm_exts(extensions: list[str] | None) -> set[str] | None:
+    """Normalize user-supplied extensions to lowercased dot-prefixed set."""
+    if not extensions:
+        return None
+    return {(e if e.startswith(".") else f".{e}").lower() for e in extensions}

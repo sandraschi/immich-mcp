@@ -266,6 +266,49 @@ class ImmichAPIClient:
             "total_size_mb": total_size_mb,
         }
 
+    async def upload_file(
+        self,
+        file_path: str,
+        *,
+        live_photo_asset_id: str | None = None,
+        duration: int | None = None,
+    ) -> dict:
+        """Upload a single file; returns the Immich asset response (id or duplicate flag).
+
+        Live Photo pairing: upload the MOV first, then pass its returned id as
+        ``live_photo_asset_id`` when uploading the HEIC still. The field name
+        differs across server versions (``livePhotoAssetId`` v2.7+, legacy
+        ``livePhotoVideoId``); the client retries with the legacy name on 400/422.
+        """
+        if not Path(file_path).exists():
+            return {"error": f"File not found: {file_path}"}
+        is_server_v3 = await self.is_v3()
+        with open(file_path, "rb") as f:
+            mime_type, _ = mimetypes.guess_type(file_path)
+            files = {"assetData": (Path(file_path).name, f, mime_type or "application/octet-stream")}
+            stat = Path(file_path).stat()
+            data: dict[str, str | int] = {
+                "fileCreatedAt": _iso_ts(stat.st_ctime),
+                "fileModifiedAt": _iso_ts(stat.st_mtime),
+                "filename": Path(file_path).name,
+            }
+            if live_photo_asset_id:
+                data["livePhotoAssetId"] = live_photo_asset_id
+            if is_server_v3:
+                # v3 removed deviceAssetId/deviceId; duration is an integer (0 for images)
+                data["duration"] = duration if duration is not None else 0
+            else:
+                data["deviceAssetId"] = Path(file_path).stem
+                data["deviceId"] = "MCP-Reconcile"
+            try:
+                return await self._post("/assets", data=data, files=files)
+            except ImmichAPIError as e:
+                if live_photo_asset_id and ("422" in str(e) or "400" in str(e)):
+                    data.pop("livePhotoAssetId", None)
+                    data["livePhotoVideoId"] = live_photo_asset_id
+                    return await self._post("/assets", data=data, files=files)
+                raise
+
     async def search_photos(
         self,
         query: str,

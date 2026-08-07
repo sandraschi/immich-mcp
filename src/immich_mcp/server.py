@@ -81,7 +81,7 @@ if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -89,6 +89,7 @@ from fastmcp import FastMCP
 from prefab_ui.app import PrefabApp
 from pydantic import BaseModel, Field
 
+from immich_mcp import reconcile as reconcile_engine
 from immich_mcp.api.v1.routes import router as v1_router
 from immich_mcp.config import ImmichConfig, get_config
 from immich_mcp.immich_api import ImmichAPIClient, ImmichAPIError
@@ -669,6 +670,227 @@ async def upload_photos(
             total_size_mb=0.0,
             upload_time_seconds=0.0,
         )
+
+
+@mcp.tool()
+async def reconcile_library(
+    operation: Annotated[
+        Literal["scan_folder", "compare", "similar", "import_new", "report"],
+        Field(
+            description=(
+                "Operation: scan_folder = local manifest only (no Immich call); "
+                "compare = scan + classify against the Immich library (checksum match, "
+                "placeholder and live-pair detection); similar = perceptual dHash "
+                "clusters for visually duplicated images; import_new = upload only "
+                "records classified as new, preserving Live Photo pairs; "
+                "report = show the latest reconciliation summary."
+            )
+        ),
+    ],
+    folder: Annotated[
+        str | None,
+        Field(description="Absolute folder path. Required for scan_folder / compare / similar."),
+    ] = None,
+    album_name: Annotated[
+        str | None,
+        Field(description="Album to place imported assets into (import_new only)."),
+    ] = None,
+    report_path: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Persist the full report JSON here (default: "
+                "data/reconcile/<folder>-<timestamp>.json). Relative paths resolve "
+                "against the server working directory."
+            )
+        ),
+    ] = None,
+    limit: Annotated[
+        int,
+        Field(description="Max records in the response list (summary is always complete).", ge=1, le=1000),
+    ] = 200,
+    offset: Annotated[int, Field(description="Pagination offset into the record list.", ge=0)] = 0,
+    similar_threshold: Annotated[
+        int,
+        Field(description="Max dHash hamming distance for similar grouping (0-32, lower = stricter).", ge=0, le=32),
+    ] = 8,
+    similar_limit: Annotated[
+        int,
+        Field(description="Max images to perceptual-hash per similar call.", ge=1, le=20000),
+    ] = 5000,
+    extensions: Annotated[
+        list[str] | None,
+        Field(description="Override media extensions, e.g. ['.heic', '.mov'] (default: common image+video)."),
+    ] = None,
+    force: Annotated[
+        bool,
+        Field(
+            description=(
+                "import_new: also upload records marked duplicate/in_library "
+                "(server-side checksum dedupe still applies)."
+            )
+        ),
+    ] = False,
+) -> dict:
+    r"""Reconcile a local photo folder against the Immich library.
+
+    [RATIONALE] Consolidates the entire "import mess" workflow - scan, classify,
+    perceptual dedupe, and live-photo-aware import - into one portmanteau so an
+    agent can drive iCloud/local-library consolidation (duplicate-heavy folders,
+    cloud placeholders, HEIC Live Photos) without chaining one-shot tools.
+
+    Workflow: scan_folder -> compare -> similar (optional) -> import_new.
+    compare caches its result; import_new reuses the latest compare state.
+
+    Key behaviors:
+    - Cloud placeholders (iCloud/OneDrive dataless stubs, e.g. an 80 GB iCloud
+      folder occupying 500 MB on disk) are detected via Win32 file attributes
+      and NEVER hashed or imported - reading them would hydrate the download.
+    - Live Photos (HEIC still + MOV video, same stem) are detected as pairs;
+      import_new uploads the MOV first and links the HEIC still to it, so the
+      "3 second video" is preserved without flattening HEIC.
+    - Checksums match Immich's base64 digest format; the algorithm (SHA-1 vs
+      SHA-256) is probed from the live server during compare.
+    - HEIC originals are never converted: Immich renders previews server-side.
+
+    ## Return Format
+    {"success": bool, "message": str, "operation": str,
+     "summary": {"total", "placeholders", "live_pairs", "in_library", "new",
+                 "duplicates", "similar_groups", "total_size_bytes"},
+     "items": [{path, name, stem, ext, size_bytes, is_placeholder, is_heic,
+                is_mov, live_pair, checksum, status, asset_id, library_path}],
+     "has_more": bool, "errors": [str], "report_path": str | None,
+     "checksum_algorithm": str, "similar_groups": [...], "import": {...}}
+
+    ## Examples
+    reconcile_library(operation="compare", folder=r"C:\Users\sandr\iCloudPhotos\Photos")
+    reconcile_library(operation="similar", similar_threshold=10)
+    reconcile_library(operation="import_new", album_name="iCloud Unique")
+    """
+    try:
+        if operation == "scan_folder":
+            if not folder:
+                return _reconcile_error("scan_folder requires a folder path")
+            result = reconcile_engine.run_scan(folder, extensions=_norm_exts(extensions))
+            items, summary = result["items"], result["summary"]
+            return _reconcile_response("scan_folder", items, summary, result["errors"], None, limit, offset)
+
+        if operation == "compare":
+            if not folder:
+                return _reconcile_error("compare requires a folder path")
+            client = await get_api_client()
+            result = await reconcile_engine.run_compare(
+                client, folder, extensions=_norm_exts(extensions), report_path=report_path
+            )
+            items, summary = result["items"], result["summary"]
+            msg = (
+                f"Scanned {summary.get('total', 0)} files in {folder}: "
+                f"{summary.get('new', 0)} new, {summary.get('in_library', 0)} already in library, "
+                f"{summary.get('placeholders', 0)} cloud placeholders, "
+                f"{summary.get('live_pairs', 0)} Live Photo pairs. "
+                f"Checksum algorithm: {result['algorithm']}."
+            )
+            resp = _reconcile_response(
+                "compare", items, summary, result["errors"], result["report_path"], limit, offset
+            )
+            resp["message"] = msg
+            resp["checksum_algorithm"] = result["algorithm"]
+            resp["indexed_assets"] = result["indexed_assets"]
+            return resp
+
+        if operation == "similar":
+            result = reconcile_engine.run_similar(threshold=similar_threshold, limit=similar_limit, folder=folder)
+            return {
+                "success": True,
+                "message": f"Found {result['group_count']} visually similar groups.",
+                "operation": "similar",
+                "summary": reconcile_engine.LAST_SUMMARY,
+                "similar_groups": result["groups"],
+                "similar_threshold": similar_threshold,
+            }
+
+        if operation == "import_new":
+            client = await get_api_client()
+            result = await reconcile_engine.run_import(client, album_name=album_name, force=force, statuses=None)
+            if not result.get("success"):
+                return _reconcile_error(result.get("error", "import failed"))
+            return {
+                "success": True,
+                "message": (
+                    f"Imported {result['imported']} files"
+                    f" ({result['duplicates']} duplicates skipped by server)."
+                    + (f" Album '{album_name}' updated." if album_name else "")
+                ),
+                "operation": "import_new",
+                "import": result,
+                "summary": reconcile_engine.LAST_SUMMARY,
+            }
+
+        if operation == "report":
+            return {
+                "success": True,
+                "message": (
+                    f"Latest reconciliation: {reconcile_engine.LAST_FOLDER or 'none'} - "
+                    f"{reconcile_engine.LAST_SUMMARY.get('total', 0)} files scanned."
+                ),
+                "operation": "report",
+                "summary": reconcile_engine.LAST_SUMMARY,
+                "folder": reconcile_engine.LAST_FOLDER,
+                "checksum_algorithm": reconcile_engine.LAST_ALGORITHM,
+                "report_path": reconcile_engine.LAST_REPORT_PATH,
+            }
+
+        return _reconcile_error(f"Unknown operation: {operation}")
+    except ImmichAPIError as e:
+        logger.error("Immich API error in reconcile_library: %s", e)
+        return _reconcile_error(str(e))
+    except Exception as e:
+        logger.exception("Unexpected error in reconcile_library")
+        return _reconcile_error(
+            str(e),
+            suggestions=[
+                "Check that the folder path exists and is readable",
+                "Check IMMICH_SERVER_URL / IMMICH_API_KEY when using compare or import_new",
+                "Verify Immich is running before compare",
+            ],
+        )
+
+
+def _norm_exts(extensions: list[str] | None) -> set[str] | None:
+    """Normalize user-supplied extensions to lowercased dot-prefixed set."""
+    if not extensions:
+        return None
+    return {(e if e.startswith(".") else f".{e}").lower() for e in extensions}
+
+
+def _reconcile_error(message: str, suggestions: list[str] | None = None) -> dict:
+    resp: dict = {"success": False, "message": message, "operation": "error", "errors": [message]}
+    if suggestions:
+        resp["suggestions"] = suggestions
+    return resp
+
+
+def _reconcile_response(
+    operation: str,
+    items: list[dict],
+    summary: dict,
+    errors: list[str],
+    report_path: str | None,
+    limit: int = 200,
+    offset: int = 0,
+) -> dict:
+    """Assemble the paginated reconcile response."""
+    page_items = items[offset : offset + limit]
+    return {
+        "success": True,
+        "message": f"{operation} complete.",
+        "operation": operation,
+        "summary": summary,
+        "items": page_items,
+        "has_more": offset + limit < len(items),
+        "errors": errors,
+        "report_path": report_path,
+    }
 
 
 @mcp.tool()

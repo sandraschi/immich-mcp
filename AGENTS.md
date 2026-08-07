@@ -22,7 +22,8 @@ uv run ruff format src/ tests/ # format
 | File | Purpose |
 |------|---------|
 | `src/immich_mcp/immich_api.py` | Immich REST client — all endpoint contracts live here |
-| `src/immich_mcp/server.py` | MCP tools (33) + FastMCP instance |
+| `src/immich_mcp/server.py` | MCP tools (34) + FastMCP instance |
+| `src/immich_mcp/reconcile.py` | Library reconciliation engine: folder scanner (cloud-placeholder detection, HEIC+MOV live pairing, Immich-compatible checksums), library index, dHash similar finder, Live Photo-aware importer |
 | `src/immich_mcp/api/v1/routes.py` | FastAPI REST routes for the webapp |
 | `src/immich_mcp/config.py` | Env config: `IMMICH_SERVER_URL`, `IMMICH_API_KEY`, `IMMICH_USERS` |
 | `mcpb/src/` | Packaging copy of the package — keep in sync with `src/immich_mcp/` |

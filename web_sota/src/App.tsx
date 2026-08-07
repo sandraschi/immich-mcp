@@ -8,6 +8,7 @@ import { Logger } from "@/pages/logger";
 import { Map as MapPage } from "@/pages/map";
 import { People } from "@/pages/people";
 import { Photos } from "@/pages/photos";
+import { Reconcile } from "@/pages/reconcile";
 import { Settings } from "@/pages/settings";
 import { Tools } from "@/pages/tools";
 import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
@@ -23,6 +24,7 @@ function App() {
           <Route path="/people" element={<People />} />
           <Route path="/map" element={<MapPage />} />
           <Route path="/libraries" element={<Libraries />} />
+          <Route path="/reconcile" element={<Reconcile />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/tools" element={<Tools />} />
           <Route path="/logger" element={<Logger />} />
