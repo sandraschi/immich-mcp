@@ -48,7 +48,7 @@ build-native:
 	$envOutput = cmd /c "`"$vcvars`" > nul & set" | Where-Object { $_ -match '^(INCLUDE|LIB|LIBPATH|VCToolsVersion|WindowsSdkDir|UniversalCRTSdkDir|UCRTVersion)=' }
 	foreach ($line in $envOutput) { $parts = $line.Split('=', 2); Set-Item -Path "env:$($parts[0])" -Value $parts[1] -ErrorAction SilentlyContinue }
 	Set-Location '{{justfile_directory()}}\native'
-	npx @tauri-apps/cli build --bundles nsis
+	pwsh -NoProfile -File '{{justfile_directory()}}\native\build.ps1'
 
 # Run the CUA smoke test against the installed NSIS app (inherits from fleet.just)
 
