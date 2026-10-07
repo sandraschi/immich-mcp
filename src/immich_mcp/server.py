@@ -169,7 +169,7 @@ through an 'operation' parameter.
 # Initialize FastMCP server
 mcp = ImmichMCP()
 
-# MCP Bridge — Proxy external MCP servers via MCP_BRIDGE_URLS
+# MCP Bridge - Proxy external MCP servers via MCP_BRIDGE_URLS
 _bridge_proxies: list[str] = []
 bridge_urls = os.getenv("MCP_BRIDGE_URLS", "")
 if bridge_urls:
@@ -217,7 +217,7 @@ _web_app = FastAPI(
     version="1.5.0",
     lifespan=_web_lifespan,
 )
-# Fleet CORS standard (mcp-central-docs/standards/CORS_STANDARD.md) — the webapp
+# Fleet CORS standard (mcp-central-docs/standards/CORS_STANDARD.md) - the webapp
 # REST routes must send CORS headers for the browser (dev Vite + Tauri WebView).
 # Without this, the frontend fetch to /api/v1/* fails with "Failed to fetch".
 _web_app.add_middleware(
@@ -247,7 +247,7 @@ try:
 
     install_log_capture()
 except Exception:
-    pass
+    logger.debug("log capture unavailable", exc_info=True)
 
 # Expose for uvicorn (e.g. web_sota/start.ps1)
 app = _web_app

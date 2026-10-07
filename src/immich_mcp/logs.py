@@ -22,7 +22,10 @@ class _RingBufferHandler(logging.Handler):
             with self._lock:
                 self._records.append(line)
         except Exception:
-            pass
+            # Logging handlers must never raise (would break the logging call
+            # itself). Route to the stdlib error handler instead of pass so
+            # failures stay visible via logging.lastResort.
+            self.handleError(record)
 
     def snapshot(self, limit: int) -> list[str]:
         with self._lock:

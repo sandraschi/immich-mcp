@@ -19,9 +19,9 @@
     "entry_point": "src/immich_mcp/server.py",
     "mcp_config": {
       "command": "uv",
-      "args": ["run", "--directory", "${PWD}", "python", "-m", "immich_mcp"],
+      "args": ["run", "--directory", "${__dirname}", "python", "-m", "immich_mcp"],
       "env": {
-        "PYTHONPATH": "${PWD}/src",
+        "PYTHONPATH": "${__dirname}/src",
         "PYTHONUNBUFFERED": "1"
       }
     }
