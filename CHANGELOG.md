@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-08-07
 
+### Fixed (assfix 2026-10-07)
+- **MCPB manifest `${PWD}` (CRITICAL)**: Claude Desktop does not expand `${PWD}` — bundle failed on real installs while passing dev checks. Replaced with `${__dirname}` in `mcp_config` args and `PYTHONPATH` (audit-mcpb-bundles.ps1 now reports no NONSPEC/SIDECAR/VENDORED).
+- **Ruff S110/S112 footgun (HIGH)**: removed the blanket ignores; fixed the three silent swallows they hid (`logs.py` emit now uses `handleError`, `server.py` log-capture fallback logs at debug, mime-type enrichment fallback logs at debug).
+- **Pyright error (HIGH)**: `reconcile.summarize` added `Unknown|None` to `set[str]` — guarded with `isinstance(str)`.
+- **Biome + tsc (HIGH)**: formatted `reconcile.tsx` (import sort), removed unused `Video` import in `photos.tsx`. `bun biome:ci` and `tsc -b && vite build` green.
+- **Absolute backend URL without Tauri gate (HIGH)**: `web_sota/src/lib/api.ts` used `http://127.0.0.1:10839` unconditionally (dead from LAN/Tailscale tabs). Now same-origin relative by default, absolute only inside the Tauri WebView (`__TAURI__`/`__TAURI_INTERNALS__` gate).
+
+### Added (assfix 2026-10-07)
+- **`POST /api/v1/shutdown` (HIGH)**: orderly-exit endpoint (200 immediately, `os._exit(0)` after 500 ms) so the fleet launcher can bounce the backend without hard-killing mid-write jobs.
+
 ### Fixed
 - **Webapp "Failed to fetch" (CORS)**: the webapp REST routes live on a separate FastAPI app (`_web_app`) from the MCP `http_app()`; CORS was only attached to the MCP app, so browsers blocked every `/api/v1/*` fetch while curl/PowerShell worked. Added the fleet CORS middleware to `_web_app` (immich-mcp + rustdesk-mcp, documented in `CORS_STANDARD.md`).
 - **Health-poll log spam**: `useBackendStatus` reset the backoff counter on every successful poll, so a healthy backend was probed every 1s forever (several requests/sec per open tab). Healthy state now polls every 10s; exponential backoff (1s/2s/4s/8s/16s) only while unreachable.
