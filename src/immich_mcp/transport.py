@@ -246,7 +246,7 @@ async def run_server_async(mcp_app, args: argparse.Namespace | None = None, serv
             async def health():
                 return {"status": "ok", "server": server_name}
 
-            # Run Uvicorn directly on the configured ASGI app — FastMCP's
+            # Run Uvicorn directly on the configured ASGI app - FastMCP's
             # run_http_async() spawns its own internal app and drops custom
             # middlewares (CORS would silently vanish).
             server = uvicorn.Server(uvicorn.Config(app, host=host, port=port, log_level="info"))
