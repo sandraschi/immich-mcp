@@ -16,7 +16,6 @@ import {
   RotateCcw,
   Search,
   Star,
-  Video,
   X,
   ZoomIn,
   ZoomOut,

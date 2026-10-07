@@ -1,5 +1,1 @@
-{
-  "timestamp": "2026-08-06T23:10:32.0837115+02:00",
-  "host": "GOLIATH",
-  "commit": "aad2bb733388d4f5b0ed3a9a74cd323025dfa73e"
-}
+{"commit": "HEAD-to-be-filled-after-commit","host": "Goliath","report": "docs/assess-reports/2026-10-07.md","score_after": 12,"score_after_note": "self-assessed (unverified), cold rescore recommended","score_before": 0,"timestamp": "2026-10-07T20:52:17.8342730+02:00"}

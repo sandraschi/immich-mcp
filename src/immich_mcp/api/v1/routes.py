@@ -118,6 +118,25 @@ async def health_check():
 # ===== USER MANAGEMENT ENDPOINTS =====
 
 
+@router.post("/shutdown")
+async def shutdown_server():
+    """Orderly shutdown: lets the fleet launcher bounce the backend safely.
+
+    Responds 200 immediately, then exits the process after 500 ms so
+    in-flight writes can checkpoint. Called by Invoke-FleetWebappStart
+    before Restart-Service; without it the launcher hard-kills the process.
+    """
+    logger.warning("POST /api/v1/shutdown invoked - orderly exit in 500 ms")
+
+    async def _delayed_exit() -> None:
+        await asyncio.sleep(0.5)
+        os._exit(0)
+
+    _task = asyncio.ensure_future(_delayed_exit())
+    _task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+    return {"success": True, "message": "shutting down in 500 ms"}
+
+
 @router.get("/users")
 async def get_users():
     """Get list of configured Immich users."""
@@ -202,7 +221,8 @@ async def get_photo_file(asset_id: str):
             info = await client.get_asset_info(asset_id)
             media_type = info.get("originalMimeType") or media_type
         except Exception:
-            pass
+            # Optional enrichment only: fall back to octet-stream.
+            logger.debug("mime-type enrichment failed for %s", asset_id, exc_info=True)
         return Response(content=content, media_type=media_type)
     except ImmichAPIError as e:
         raise _immich_error_to_http(e) from e
@@ -315,7 +335,7 @@ async def get_timeline(
                 {
                     "id": photo.get("id", ""),
                     "original_filename": photo.get("originalFileName", "Unknown"),
-                    # Real photo date, not the import date — the date filter
+                    # Real photo date, not the import date - the date filter
                     # (takenAfter/takenBefore) matches fileCreatedAt, so the
                     # timeline must display the same field to stay consistent.
                     "created_at": photo.get("fileCreatedAt", photo.get("createdAt", "")),
@@ -324,7 +344,7 @@ async def get_timeline(
                 }
             )
         # Immich's /search/metadata "assets.total" is the PAGE count, not the
-        # overall total — do not use it. has_more = full page fetched.
+        # overall total - do not use it. has_more = full page fetched.
         has_more = len(items) == limit
         total = None
         filters_active = any(
