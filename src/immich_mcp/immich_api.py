@@ -390,7 +390,7 @@ class ImmichAPIClient:
     ) -> tuple[list[dict], int | None]:
         """Paginated metadata search with filters (POST /search/metadata, v2.7+ / v3).
 
-        Returns ``(items, total)`` — total is None when the server omits it.
+        Returns ``(items, total)`` - total is None when the server omits it.
 
         Filters are official Immich ``/search/metadata`` params only (see AGENTS.md
         API contract notes): type, isFavorite, isArchived, withArchived,
