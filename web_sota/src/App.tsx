@@ -8,6 +8,7 @@ import { Libraries } from "@/pages/libraries";
 import { Logger } from "@/pages/logger";
 import { Map as MapPage } from "@/pages/map";
 import { People } from "@/pages/people";
+import { PersonDetail } from "@/pages/person-detail";
 import { Photos } from "@/pages/photos";
 import { Reconcile } from "@/pages/reconcile";
 import { Settings } from "@/pages/settings";
@@ -24,6 +25,7 @@ function App() {
           <Route path="/albums" element={<Albums />} />
           <Route path="/albums/:id" element={<AlbumDetail />} />
           <Route path="/people" element={<People />} />
+          <Route path="/people/:id" element={<PersonDetail />} />
           <Route path="/map" element={<MapPage />} />
           <Route path="/libraries" element={<Libraries />} />
           <Route path="/reconcile" element={<Reconcile />} />

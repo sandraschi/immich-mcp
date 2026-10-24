@@ -1,5 +1,6 @@
 import { Filter, Loader2, Search, User, Users } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface Person {
   id: string;
@@ -9,6 +10,7 @@ interface Person {
 }
 
 export function People() {
+  const navigate = useNavigate();
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -126,9 +128,11 @@ export function People() {
           >
             {filteredPeople.map((person) =>
               viewMode === "grid" ? (
-                <div
+                <button
                   key={person.id}
-                  className="group relative flex flex-col items-center gap-3 p-4 bg-slate-900/40 hover:bg-slate-800/60 rounded-2xl border border-slate-800/50 transition-all duration-300 cursor-pointer hover:-translate-y-1 shadow-lg border-b-2 hover:border-b-primary/50"
+                  type="button"
+                  onClick={() => navigate(`/people/${person.id}`)}
+                  className="group relative flex flex-col items-center gap-3 p-4 bg-slate-900/40 hover:bg-slate-800/60 rounded-2xl border border-slate-800/50 transition-all duration-300 cursor-pointer hover:-translate-y-1 shadow-lg border-b-2 hover:border-b-primary/50 text-left w-full"
                 >
                   <div className="relative h-24 w-24 rounded-full overflow-hidden border-2 border-slate-800 group-hover:border-primary/30 transition-colors shadow-2xl">
                     {person.thumbnailPath ? (
@@ -174,11 +178,13 @@ export function People() {
                       <Filter className="h-3 w-3 text-primary" />
                     </div>
                   </div>
-                </div>
+                </button>
               ) : (
-                <div
+                <button
                   key={person.id}
-                  className="flex items-center justify-between p-3 bg-slate-900/30 hover:bg-slate-800/50 rounded-xl border border-slate-800/50 transition-colors cursor-pointer group"
+                  type="button"
+                  onClick={() => navigate(`/people/${person.id}`)}
+                  className="flex w-full items-center justify-between p-3 bg-slate-900/30 hover:bg-slate-800/50 rounded-xl border border-slate-800/50 transition-colors cursor-pointer group text-left"
                 >
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 group-hover:border-primary/30 transition-colors overflow-hidden">
@@ -195,11 +201,11 @@ export function People() {
                     <span className="text-xs font-medium text-slate-400 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50">
                       {person.name ? "Named" : "Unnamed"}
                     </span>
-                    <button className="text-primary opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold uppercase tracking-tighter">
+                    <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold uppercase tracking-tighter">
                       Manage
-                    </button>
+                    </span>
                   </div>
-                </div>
+                </button>
               ),
             )}
           </div>
