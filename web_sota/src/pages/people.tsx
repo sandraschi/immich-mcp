@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 interface Person {
   id: string;
   name: string;
-  assetCount: number;
+  isHidden?: boolean;
   thumbnailPath?: string;
 }
 
@@ -38,9 +38,9 @@ export function People() {
   }, []);
 
   const filteredPeople = people.filter(
-    (p) =>
-      (p.name || "Unnamed").toLowerCase().includes(searchQuery.toLowerCase()) && p.assetCount > 1,
+    (p) => !p.isHidden && (p.name || "Unnamed").toLowerCase().includes(searchQuery.toLowerCase()),
   );
+  const namedCount = people.filter((p) => !p.isHidden && p.name).length;
 
   return (
     <div className="space-y-6 pb-20" data-testid="people-page">
@@ -49,6 +49,12 @@ export function People() {
           <h1 className="text-3xl font-bold tracking-tight text-white mb-2">People</h1>
           <p className="text-slate-400">
             Manage face recognition clusters and identify family & friends.
+            {people.length > 0 && (
+              <span className="ml-2 text-slate-500">
+                {people.filter((p) => !p.isHidden).length} shown
+                {namedCount > 0 ? ` · ${namedCount} named` : " · none named yet"}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 bg-slate-900/50 p-1 rounded-lg border border-slate-800">
@@ -101,7 +107,11 @@ export function People() {
             <Users className="h-12 w-12 mb-4 opacity-20" />
             <p className="text-lg font-medium">No people found.</p>
             <p className="text-sm opacity-60 mt-2">
-              Try re-running face detection in the Immich dashboard.
+              {searchQuery
+                ? "No one matches that name — try clearing the search."
+                : people.length > 0
+                  ? "Everyone here is hidden — unhide people in the Immich app."
+                  : "No faces detected yet — run machine learning jobs, then re-run face detection in Immich."}
             </p>
           </div>
         )}
@@ -155,7 +165,7 @@ export function People() {
                       {person.name || "Unnamed"}
                     </h3>
                     <span className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">
-                      {person.assetCount} Assets
+                      {person.name ? "Named" : "Unnamed face"}
                     </span>
                   </div>
                   {/* Action button */}
@@ -183,7 +193,7 @@ export function People() {
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-xs font-medium text-slate-400 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50">
-                      {person.assetCount} assets
+                      {person.name ? "Named" : "Unnamed"}
                     </span>
                     <button className="text-primary opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold uppercase tracking-tighter">
                       Manage

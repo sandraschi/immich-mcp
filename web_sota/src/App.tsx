@@ -1,4 +1,5 @@
 import { AppLayout } from "@/components/layout/app-layout";
+import { AlbumDetail } from "@/pages/album-detail";
 import { Albums } from "@/pages/albums";
 import { Chat } from "@/pages/chat";
 import { Dashboard } from "@/pages/dashboard";
@@ -21,6 +22,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/photos" element={<Photos />} />
           <Route path="/albums" element={<Albums />} />
+          <Route path="/albums/:id" element={<AlbumDetail />} />
           <Route path="/people" element={<People />} />
           <Route path="/map" element={<MapPage />} />
           <Route path="/libraries" element={<Libraries />} />

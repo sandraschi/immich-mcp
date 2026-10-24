@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased] - 2026-10-24
+
+### Added - album detail + CUD (page click-through, create/rename/delete)
+- Clicking an album now opens `/albums/:id` with photos grid (thumbnails),
+  inline rename, description edit, delete (two-click confirm, photos kept),
+  per-photo remove, and add-via-search picker.
+- Backend: `GET|PATCH|DELETE /api/v1/albums/{id}`,
+  `DELETE /api/v1/albums/{id}/photos`; MCP tools `get_album_details`,
+  `update_album`, `delete_album`, `remove_from_album` (tools list is
+  dynamic, no registry update needed).
+- Client: `_patch`, `get_album`, `update_album`, `delete_album`,
+  `remove_assets_from_album`, `albumIds` filter on `search_metadata`
+  (GET /albums/{id} omits assets in v3 — assets come from search).
+- Fixed data: removed 8 leftover "Test Album v2.4.0 Integration" empties.
+- Tests: 11 new (album CUD fences + albumIds search contract). Full suite:
+  84 passed.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
