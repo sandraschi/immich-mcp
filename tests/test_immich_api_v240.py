@@ -601,3 +601,60 @@ class TestAlbumAssetListing:
             assert body["albumIds"] == ["a1"]
             assert [i["id"] for i in items] == ["p1"]
             assert total == 1
+
+
+class TestPersonCUD:
+    """Person rename/delete/photos — verified live 2026-10-24 (v3.x)."""
+
+    @pytest.mark.asyncio
+    async def test_get_person(self, api_client):
+        """GET /people/{id}"""
+        with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = {"id": "p1", "name": ""}
+
+            result = await api_client.get_person("p1")
+
+            mock_get.assert_called_with("/people/p1")
+            assert result["id"] == "p1"
+
+    @pytest.mark.asyncio
+    async def test_get_person_rejects_blank(self, api_client):
+        with pytest.raises(ImmichAPIError):
+            await api_client.get_person("  ")
+
+    @pytest.mark.asyncio
+    async def test_update_person_name(self, api_client):
+        """PUT /people/{id} with name body"""
+        with patch.object(api_client, "_put", new_callable=AsyncMock) as mock_put:
+            mock_put.return_value = {"id": "p1", "name": "Maria"}
+
+            result = await api_client.update_person("p1", "Maria")
+
+            mock_put.assert_called_with("/people/p1", data={"name": "Maria"})
+            assert result["name"] == "Maria"
+
+    @pytest.mark.asyncio
+    async def test_update_person_needs_name_arg(self, api_client):
+        with pytest.raises(ImmichAPIError):
+            await api_client.update_person("p1")
+
+    @pytest.mark.asyncio
+    async def test_delete_person(self, api_client):
+        with patch.object(api_client, "_delete", new_callable=AsyncMock) as mock_delete:
+            mock_delete.return_value = {"success": True}
+
+            await api_client.delete_person("p1")
+
+            mock_delete.assert_called_with("/people/p1")
+
+    @pytest.mark.asyncio
+    async def test_get_person_assets_uses_person_ids(self, api_client):
+        """Assets come from POST /search/metadata with personIds"""
+        with patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = {"assets": {"items": [{"id": "a1"}], "total": 1}}
+
+            items = await api_client.get_person_assets("p1", size=50)
+
+            body = mock_post.call_args.kwargs["data"]
+            assert body["personIds"] == ["p1"]
+            assert [i["id"] for i in items] == ["a1"]
