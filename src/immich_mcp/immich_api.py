@@ -388,6 +388,7 @@ class ImmichAPIClient:
         taken_after: str | None = None,
         taken_before: str | None = None,
         album_ids: list[str] | None = None,
+        person_ids: list[str] | None = None,
     ) -> tuple[list[dict], int | None]:
         """Paginated metadata search with filters (POST /search/metadata, v2.7+ / v3).
 
@@ -395,7 +396,7 @@ class ImmichAPIClient:
 
         Filters are official Immich ``/search/metadata`` params only (see AGENTS.md
         API contract notes): type, isFavorite, isArchived, withArchived,
-        takenAfter, takenBefore, albumIds.
+        takenAfter, takenBefore, albumIds, personIds.
         """
         size = min(size, 1000)
         body: dict = {"page": page, "size": size, "order": "desc"}
@@ -413,6 +414,8 @@ class ImmichAPIClient:
             body["takenBefore"] = taken_before
         if album_ids:
             body["albumIds"] = album_ids
+        if person_ids:
+            body["personIds"] = person_ids
         result = await self._post("/search/metadata", data=body)
         if isinstance(result, list):
             return result, None
@@ -740,23 +743,6 @@ class ImmichAPIClient:
             ),
         }
 
-    async def update_person(self, person_id: str, name: str, face_asset_ids: list[str] | None = None) -> dict:
-        """Update person with name and merge faces"""
-        data = {"name": name}
-
-        result = await self._put(f"/people/{person_id}", data=data)
-
-        # Merge additional faces if provided
-        if face_asset_ids:
-            merge_data = {"ids": face_asset_ids}
-            await self._put(f"/people/{person_id}/merge", data=merge_data)
-
-        return {
-            "faces_merged": len(face_asset_ids) if face_asset_ids else 0,
-            "total_faces": result.get("assetCount", 0),
-            "updated_at": result.get("updatedAt", ""),
-        }
-
     async def search_photos_by_person(
         self, person_name: str, limit: int = 50, *, include_metadata: bool = True
     ) -> list[dict]:
@@ -1047,6 +1033,46 @@ class ImmichAPIClient:
     async def get_asset_original(self, asset_id: str) -> bytes:
         """Get the original file bytes for an asset. Immich API: GET /assets/:id/original."""
         return await self.get_binary(f"/assets/{asset_id}/original")
+
+    async def get_person(self, person_id: str) -> dict:
+        """Get a single person by id (GET /people/{id})."""
+        if not person_id or not person_id.strip():
+            raise ImmichAPIError("person_id must not be empty")
+        return await self._get(f"/people/{person_id.strip()}")
+
+    async def update_person(
+        self, person_id: str, name: str | None = None, face_asset_ids: list[str] | None = None
+    ) -> dict:
+        """Rename a person (PUT /people/{id}) and optionally merge faces.
+
+        Empty string clears the name. When face_asset_ids are given, those
+        faces are merged into this person via PUT /people/{id}/merge.
+        """
+        if not person_id or not person_id.strip():
+            raise ImmichAPIError("person_id must not be empty")
+        if name is None and not face_asset_ids:
+            raise ImmichAPIError("nothing to update: pass a name and/or face_asset_ids")
+        result: dict = {"id": person_id.strip()}
+        if name is not None:
+            result = await self._put(f"/people/{person_id.strip()}", data={"name": name})
+        if face_asset_ids:
+            merge_data = {"ids": face_asset_ids}
+            await self._put(f"/people/{person_id.strip()}/merge", data=merge_data)
+            result["faces_merged"] = len(face_asset_ids)
+        return result
+
+    async def delete_person(self, person_id: str) -> dict:
+        """Delete a person cluster (faces become unassigned, photos stay)."""
+        if not person_id or not person_id.strip():
+            raise ImmichAPIError("person_id must not be empty")
+        return await self._delete(f"/people/{person_id.strip()}")
+
+    async def get_person_assets(self, person_id: str, size: int = 100) -> list[dict]:
+        """Photos showing this person via official personIds search filter."""
+        if not person_id or not person_id.strip():
+            raise ImmichAPIError("person_id must not be empty")
+        items, _ = await self.search_metadata(album_ids=None, size=size, person_ids=[person_id.strip()])
+        return items
 
     async def get_all_people(self) -> list[dict]:
         """Get all detected people"""

@@ -2055,6 +2055,76 @@ async def remove_from_album(album_id: str, asset_ids: list[str]) -> AlbumRemoveR
 
 
 @mcp.tool()
+async def delete_person(person_id: str) -> dict:
+    r"""Delete a person cluster (their photos stay in the library, faces become unassigned).
+
+    Parameters:
+        person_id (str, REQUIRED): Person ID from the People page or list tools.
+            Confirm with the user first — this cannot be undone.
+
+    Returns:
+        Dict {deleted: True, person_id} or {deleted: False, error}.
+    """
+    try:
+        client = await get_api_client()
+
+        await client.delete_person(person_id=person_id)
+        return {"deleted": True, "person_id": person_id}
+
+    except ImmichAPIError as e:
+        logger.error("Immich API error in delete_person: %s", e)
+        return {"deleted": False, "person_id": person_id, "error": str(e)}
+
+
+@mcp.tool()
+async def rename_person(person_id: str, name: str) -> dict:
+    r"""Name or rename a person (empty string clears the name).
+
+    Parameters:
+        person_id (str, REQUIRED): Person ID.
+        name (str, REQUIRED): New display name; empty string clears it.
+
+    Returns:
+        Dict {renamed: True, person: {...}} or {renamed: False, error}.
+    """
+    try:
+        client = await get_api_client()
+
+        person = await client.update_person(person_id=person_id, name=name)
+        return {"renamed": True, "person": {"id": person.get("id", person_id), "name": person.get("name", name)}}
+
+    except ImmichAPIError as e:
+        logger.error("Immich API error in rename_person: %s", e)
+        return {"renamed": False, "person_id": person_id, "error": str(e)}
+
+
+@mcp.tool()
+async def get_person_photos(person_id: str, size: int = 100) -> dict:
+    r"""List photos showing one person (via official personIds search filter).
+
+    Parameters:
+        person_id (str, REQUIRED): Person ID.
+        size (int, OPTIONAL): Max photos (1-1000, default 100).
+
+    Returns:
+        Dict {person_id, count, assets: [{id, type, ...}]}.
+    """
+    try:
+        client = await get_api_client()
+
+        items = await client.get_person_assets(person_id=person_id, size=max(1, min(size, 1000)))
+        return {
+            "person_id": person_id,
+            "count": len(items),
+            "assets": [{"id": a.get("id", ""), "type": a.get("type", "")} for a in items if a.get("id")],
+        }
+
+    except ImmichAPIError as e:
+        logger.error("Immich API error in get_person_photos: %s", e)
+        return {"person_id": person_id, "count": 0, "assets": [], "error": str(e)}
+
+
+@mcp.tool()
 async def list_albums(*, shared: bool | None = None, include_stats: bool = True) -> list[AlbumInfo]:
     r"""List all albums with metadata and statistics.
 

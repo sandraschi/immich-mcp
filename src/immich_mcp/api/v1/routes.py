@@ -191,6 +191,66 @@ async def get_person_thumbnail(person_id: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.get("/people/{person_id}")
+async def get_person(person_id: str, size: int = 100):
+    """Get one person with their photos (via personIds search)."""
+    try:
+        from ...server import get_person_photos as photos_tool
+        from ...server import mcp
+
+        client = mcp.immich_client
+        if client is None:
+            raise HTTPException(status_code=503, detail="Immich client not initialized")
+        person = await client.get_person(person_id)
+        photos = await photos_tool(person_id, size)
+        return {
+            "id": person.get("id", person_id),
+            "name": person.get("name", ""),
+            "birthDate": person.get("birthDate"),
+            "isHidden": person.get("isHidden", False),
+            "thumbnailPath": person.get("thumbnailPath"),
+            "updatedAt": person.get("updatedAt", ""),
+            "assets": photos.get("assets", []),
+            "asset_count": photos.get("count", 0),
+        }
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.put("/people/{person_id}")
+async def rename_person(person_id: str, name: str = ""):
+    """Rename a person (empty string clears the name)."""
+    try:
+        from ...server import rename_person as rename_tool
+
+        result = await rename_tool(person_id, name)
+        if isinstance(result, dict) and not result.get("renamed"):
+            raise HTTPException(status_code=400, detail=str(result.get("error")))
+        return result
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.delete("/people/{person_id}")
+async def delete_person(person_id: str):
+    """Delete a person cluster (photos stay, faces become unassigned)."""
+    try:
+        from ...server import delete_person as delete_tool
+
+        result = await delete_tool(person_id)
+        if isinstance(result, dict) and not result.get("deleted"):
+            raise HTTPException(status_code=400, detail=str(result.get("error")))
+        return result
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.get("/photos/{asset_id}/thumbnail")
 async def get_photo_thumbnail(asset_id: str):
     """Proxy for photo thumbnails."""
