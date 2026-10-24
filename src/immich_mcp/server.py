@@ -373,6 +373,15 @@ class AlbumUpdateResult(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
+class AlbumRemoveResult(BaseModel):
+    """Album asset-removal result"""
+
+    album_id: str
+    removed_count: int = Field(description="Number of photos removed")
+    new_asset_count: int = Field(description="Total photos in album after removal")
+    errors: list[str] = Field(default_factory=list)
+
+
 class ShareResult(BaseModel):
     """Album sharing result"""
 
@@ -1927,6 +1936,122 @@ async def add_to_album(album_id: str, asset_ids: list[str]) -> AlbumUpdateResult
         return AlbumUpdateResult(
             album_id=album_id, added_count=0, duplicate_count=0, new_asset_count=0, errors=[str(e)]
         )
+
+
+@mcp.tool()
+async def get_album_details(album_id: str) -> dict:
+    r"""Get one album with its photos.
+
+    Parameters:
+        album_id (str, REQUIRED): Album ID from list_albums.
+
+    Returns:
+        Dict with id, album_name, description, created_at, updated_at,
+        asset_count, shared, and assets (list of {id} plus whatever
+        Immich returns per asset). Empty assets list when the album
+        has no photos yet. Returns {"error": ...} on failure.
+    """
+    try:
+        client = await get_api_client()
+
+        album = await client.get_album(album_id=album_id)
+        assets, _ = await client.search_metadata(album_ids=[album_id], size=100)
+        return {
+            "id": album.get("id", album_id),
+            "album_name": album.get("albumName", ""),
+            "description": album.get("description"),
+            "created_at": album.get("createdAt", ""),
+            "updated_at": album.get("updatedAt", ""),
+            "asset_count": album.get("assetCount", len(assets)),
+            "shared": album.get("shared", False),
+            "assets": [{"id": a.get("id", ""), "type": a.get("type", "")} for a in assets if a.get("id")],
+        }
+
+    except ImmichAPIError as e:
+        logger.error("Immich API error in get_album_details: %s", e)
+        return {"error": str(e), "album_id": album_id}
+
+
+@mcp.tool()
+async def update_album(album_id: str, name: str | None = None, description: str | None = None) -> dict:
+    r"""Rename an album and/or change its description.
+
+    Parameters:
+        album_id (str, REQUIRED): Album ID from list_albums.
+        name (str, OPTIONAL): New album name (non-blank).
+        description (str, OPTIONAL): New description (empty string clears it).
+        At least one of name/description is required.
+
+    Returns:
+        Dict {updated: True, album: {...}} or {updated: False, error}.
+    """
+    try:
+        client = await get_api_client()
+
+        album = await client.update_album(album_id=album_id, name=name, description=description)
+        return {
+            "updated": True,
+            "album": {
+                "id": album.get("id", album_id),
+                "album_name": album.get("albumName", name or ""),
+                "description": album.get("description"),
+                "asset_count": album.get("assetCount", 0),
+                "updated_at": album.get("updatedAt", ""),
+            },
+        }
+
+    except ImmichAPIError as e:
+        logger.error("Immich API error in update_album: %s", e)
+        return {"updated": False, "album_id": album_id, "error": str(e)}
+
+
+@mcp.tool()
+async def delete_album(album_id: str) -> dict:
+    r"""Delete an album WITHOUT deleting its photos.
+
+    Parameters:
+        album_id (str, REQUIRED): Album ID from list_albums.
+            Confirm with the user first — this cannot be undone.
+
+    Returns:
+        Dict {deleted: True, album_id} or {deleted: False, error}.
+    """
+    try:
+        client = await get_api_client()
+
+        await client.delete_album(album_id=album_id)
+        return {"deleted": True, "album_id": album_id}
+
+    except ImmichAPIError as e:
+        logger.error("Immich API error in delete_album: %s", e)
+        return {"deleted": False, "album_id": album_id, "error": str(e)}
+
+
+@mcp.tool()
+async def remove_from_album(album_id: str, asset_ids: list[str]) -> AlbumRemoveResult:
+    r"""Remove photos from an album (photos stay in the library).
+
+    Parameters:
+        album_id (str, REQUIRED): Album ID from list_albums.
+        asset_ids (List[str], REQUIRED): Photo IDs to detach (max 100 per call).
+
+    Returns:
+        AlbumRemoveResult with removed_count, new_asset_count, errors.
+    """
+    try:
+        client = await get_api_client()
+
+        result = await client.remove_assets_from_album(album_id=album_id, asset_ids=asset_ids)
+        return AlbumRemoveResult(
+            album_id=album_id,
+            removed_count=result.get("removed_count", 0),
+            new_asset_count=result.get("new_asset_count", 0),
+            errors=result.get("errors", []),
+        )
+
+    except ImmichAPIError as e:
+        logger.error("Immich API error in remove_from_album: %s", e)
+        return AlbumRemoveResult(album_id=album_id, removed_count=0, new_asset_count=0, errors=[str(e)])
 
 
 @mcp.tool()

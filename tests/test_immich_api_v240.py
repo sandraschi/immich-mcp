@@ -506,3 +506,98 @@ class TestImmichMCPIntegration:
         assert client.base_url == "http://localhost:2283"
         assert client.current_user.api_key == "test_api_key_12345"
         assert config.timeout == 30
+
+
+class TestAlbumCUD:
+    """Album read/update/delete/remove — verified live 2026-10-24 (v3.x)."""
+
+    @pytest.mark.asyncio
+    async def test_get_album(self, api_client):
+        """GET /albums/{id} returns the raw album dict"""
+        with patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = {"id": "a1", "albumName": "X", "assets": [{"id": "p1"}]}
+
+            result = await api_client.get_album("a1")
+
+            mock_get.assert_called_with("/albums/a1")
+            assert result["albumName"] == "X"
+
+    @pytest.mark.asyncio
+    async def test_get_album_rejects_blank(self, api_client):
+        """Blank album id fails before any network"""
+        with pytest.raises(ImmichAPIError):
+            await api_client.get_album("   ")
+
+    @pytest.mark.asyncio
+    async def test_update_album_name(self, api_client):
+        """PATCH /albums/{id} sends only provided fields"""
+        with patch.object(api_client, "_patch", new_callable=AsyncMock) as mock_patch:
+            mock_patch.return_value = {"id": "a1", "albumName": "New"}
+
+            result = await api_client.update_album("a1", name="New")
+
+            mock_patch.assert_called_with("/albums/a1", data={"albumName": "New"})
+            assert result["albumName"] == "New"
+
+    @pytest.mark.asyncio
+    async def test_update_album_needs_fields(self, api_client):
+        """No fields -> error before network"""
+        with pytest.raises(ImmichAPIError):
+            await api_client.update_album("a1")
+
+    @pytest.mark.asyncio
+    async def test_update_album_rejects_blank_name(self, api_client):
+        """Blank name rejected before network"""
+        with pytest.raises(ImmichAPIError):
+            await api_client.update_album("a1", name="  ")
+
+    @pytest.mark.asyncio
+    async def test_delete_album(self, api_client):
+        """DELETE /albums/{id}"""
+        with patch.object(api_client, "_delete", new_callable=AsyncMock) as mock_delete:
+            mock_delete.return_value = {"success": True}
+
+            await api_client.delete_album("a1")
+
+            mock_delete.assert_called_with("/albums/a1")
+
+    @pytest.mark.asyncio
+    async def test_remove_assets_from_album(self, api_client):
+        """DELETE /albums/{id}/assets with ids body, refreshes count"""
+        with (
+            patch.object(api_client, "_delete", new_callable=AsyncMock) as mock_delete,
+            patch.object(api_client, "_get", new_callable=AsyncMock) as mock_get,
+        ):
+            mock_delete.return_value = {"success": True}
+            mock_get.return_value = {"assetCount": 4}
+
+            result = await api_client.remove_assets_from_album("a1", ["p1", "p2"])
+
+            mock_delete.assert_called_with("/albums/a1/assets", data={"ids": ["p1", "p2"]})
+            assert result["removed_count"] == 2
+            assert result["new_asset_count"] == 4
+
+    @pytest.mark.asyncio
+    async def test_remove_assets_rejects_empty_and_oversize(self, api_client):
+        """Empty/oversize uid lists fail before network"""
+        with pytest.raises(ImmichAPIError):
+            await api_client.remove_assets_from_album("a1", [])
+        with pytest.raises(ImmichAPIError):
+            await api_client.remove_assets_from_album("a1", [f"p{i}" for i in range(101)])
+
+
+class TestAlbumAssetListing:
+    """Album assets come from albumIds search, not from GET /albums (which omits them)."""
+
+    @pytest.mark.asyncio
+    async def test_search_accepts_album_ids(self, api_client):
+        """albumIds filter is sent through to POST /search/metadata"""
+        with patch.object(api_client, "_post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = {"assets": {"items": [{"id": "p1"}], "total": 1}}
+
+            items, total = await api_client.search_metadata(album_ids=["a1"], size=50)
+
+            body = mock_post.call_args.kwargs["data"]
+            assert body["albumIds"] == ["a1"]
+            assert [i["id"] for i in items] == ["p1"]
+            assert total == 1

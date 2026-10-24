@@ -387,6 +387,7 @@ class ImmichAPIClient:
         with_archived: bool | None = None,
         taken_after: str | None = None,
         taken_before: str | None = None,
+        album_ids: list[str] | None = None,
     ) -> tuple[list[dict], int | None]:
         """Paginated metadata search with filters (POST /search/metadata, v2.7+ / v3).
 
@@ -394,7 +395,7 @@ class ImmichAPIClient:
 
         Filters are official Immich ``/search/metadata`` params only (see AGENTS.md
         API contract notes): type, isFavorite, isArchived, withArchived,
-        takenAfter, takenBefore.
+        takenAfter, takenBefore, albumIds.
         """
         size = min(size, 1000)
         body: dict = {"page": page, "size": size, "order": "desc"}
@@ -410,6 +411,8 @@ class ImmichAPIClient:
             body["takenAfter"] = taken_after
         if taken_before:
             body["takenBefore"] = taken_before
+        if album_ids:
+            body["albumIds"] = album_ids
         result = await self._post("/search/metadata", data=body)
         if isinstance(result, list):
             return result, None
@@ -593,6 +596,70 @@ class ImmichAPIClient:
             "duplicate_count": 0,  # Would need more complex logic to detect
             "new_asset_count": album_info.get("assetCount", 0),
             "errors": [],
+        }
+
+    async def _patch(self, endpoint: str, data: dict | None = None) -> dict:
+        """Make PATCH request to Immich API (album updates)."""
+        try:
+            url = f"{self.base_url}/api{endpoint}"
+            response = await self.client.patch(url, json=data)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            error_detail = f"HTTP {e.response.status_code}"
+            try:
+                error_body = e.response.json()
+                if isinstance(error_body, dict):
+                    error_message = error_body.get("message", error_body.get("error", str(e)))
+                    error_detail = f"{error_detail}: {error_message}"
+            except Exception:
+                error_detail = f"{error_detail}: {e.response.text[:200]}"
+            raise ImmichAPIError(f"PATCH {endpoint} failed - {error_detail}") from e
+        except Exception as e:
+            raise ImmichAPIError(f"PATCH {endpoint} failed: {e}") from e
+
+    async def get_album(self, album_id: str) -> dict:
+        """Get a single album including its assets (GET /albums/{id})."""
+        if not album_id or not album_id.strip():
+            raise ImmichAPIError("album_id must not be empty")
+        return await self._get(f"/albums/{album_id.strip()}")
+
+    async def update_album(self, album_id: str, name: str | None = None, description: str | None = None) -> dict:
+        """Rename / re-describe an album (PATCH /albums/{id})."""
+        if not album_id or not album_id.strip():
+            raise ImmichAPIError("album_id must not be empty")
+        data: dict = {}
+        if name is not None:
+            if not name.strip():
+                raise ImmichAPIError("album name must not be blank")
+            data["albumName"] = name.strip()
+        if description is not None:
+            data["description"] = description
+        if not data:
+            raise ImmichAPIError("nothing to update: pass name and/or description")
+        return await self._patch(f"/albums/{album_id.strip()}", data=data)
+
+    async def delete_album(self, album_id: str) -> dict:
+        """Delete an album without deleting its assets (DELETE /albums/{id})."""
+        if not album_id or not album_id.strip():
+            raise ImmichAPIError("album_id must not be empty")
+        return await self._delete(f"/albums/{album_id.strip()}")
+
+    async def remove_assets_from_album(self, album_id: str, asset_ids: list[str]) -> dict:
+        """Remove assets from an album (DELETE /albums/{id}/assets)."""
+        if not album_id or not album_id.strip():
+            raise ImmichAPIError("album_id must not be empty")
+        if not asset_ids:
+            raise ImmichAPIError("asset_ids must not be empty (max 100 per call)")
+        if len(asset_ids) > 100:
+            raise ImmichAPIError("asset_ids exceeds 100 per call — page it")
+        result = await self._delete(f"/albums/{album_id.strip()}/assets", data={"ids": asset_ids})
+        album_info = await self._get(f"/albums/{album_id.strip()}")
+        return {
+            "removed_count": len(asset_ids),
+            "new_asset_count": album_info.get("assetCount", 0),
+            "errors": [],
+            "raw": result,
         }
 
     async def get_albums(self, *, shared: bool | None = None, include_stats: bool = True) -> list[dict]:

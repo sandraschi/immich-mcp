@@ -185,7 +185,7 @@ async def get_person_thumbnail(person_id: str):
         client = mcp.immich_client
         if client is None:
             raise HTTPException(status_code=503, detail="Immich client not initialized")
-        content = await client.get_binary(f"/person/{person_id}/thumbnail")
+        content = await client.get_binary(f"/people/{person_id}/thumbnail")
         return Response(content=content, media_type="image/webp")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -529,6 +529,82 @@ async def add_to_album(
         from ...server import add_to_album as add_tool
 
         return await add_tool(album_id, asset_ids)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/albums/{album_id}")
+async def get_album(
+    album_id: str,
+    client: ImmichAPIClient = Depends(get_api_client),
+):
+    """Get one album with its photos."""
+    try:
+        from ...server import get_album_details as get_tool
+
+        result = await get_tool(album_id)
+        if isinstance(result, dict) and "error" in result:
+            raise HTTPException(status_code=404, detail=result["error"])
+        return result
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.patch("/albums/{album_id}")
+async def update_album(
+    album_id: str,
+    name: str | None = None,
+    description: str | None = None,
+    client: ImmichAPIClient = Depends(get_api_client),
+):
+    """Rename an album and/or change its description."""
+    try:
+        from ...server import update_album as update_tool
+
+        result = await update_tool(album_id, name, description)
+        if isinstance(result, dict) and not result.get("updated"):
+            raise HTTPException(status_code=400, detail=str(result.get("error")))
+        return result
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.delete("/albums/{album_id}")
+async def delete_album(
+    album_id: str,
+    client: ImmichAPIClient = Depends(get_api_client),
+):
+    """Delete an album WITHOUT deleting its photos."""
+    try:
+        from ...server import delete_album as delete_tool
+
+        result = await delete_tool(album_id)
+        if isinstance(result, dict) and not result.get("deleted"):
+            raise HTTPException(status_code=400, detail=str(result.get("error")))
+        return result
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.delete("/albums/{album_id}/photos")
+async def remove_from_album(
+    album_id: str,
+    asset_ids: list[str],
+    client: ImmichAPIClient = Depends(get_api_client),
+):
+    """Remove photos from an album (photos stay in the library)."""
+    try:
+        from ...server import remove_from_album as remove_tool
+
+        return await remove_tool(album_id, asset_ids)
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
