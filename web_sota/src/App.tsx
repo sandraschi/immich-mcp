@@ -1,6 +1,7 @@
 import { AppLayout } from "@/components/layout/app-layout";
 import { AlbumDetail } from "@/pages/album-detail";
 import { Albums } from "@/pages/albums";
+import { ApiDocs } from "@/pages/api-docs";
 import { Chat } from "@/pages/chat";
 import { Dashboard } from "@/pages/dashboard";
 import { Help } from "@/pages/help";
@@ -32,6 +33,7 @@ function App() {
           <Route path="/chat" element={<Chat />} />
           <Route path="/tools" element={<Tools />} />
           <Route path="/logger" element={<Logger />} />
+          <Route path="/api-docs" element={<ApiDocs />} />
           <Route path="/help" element={<Help />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
