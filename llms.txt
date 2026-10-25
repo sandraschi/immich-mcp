@@ -7,7 +7,7 @@ MCP server for Immich photo library management. Semantic photo search, album man
 ## Key Tools
 - **Photo search** — CLIP-based semantic search, text/EXIF metadata search
 - **Album management** — create, list, add to, share albums
-- **People / faces** — facial recognition, tag people, search by person
+- **People / faces** - face-cluster triage with photo counts, naming, bulk delete, single-photo crowd cleanup
 - **OCR search** — multilingual text-in-image search with bounding boxes (v2.3+)
 - **Upload / import** — photo upload, library management
 - **Export / backup** — export and backup photos

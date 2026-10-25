@@ -383,6 +383,17 @@ uv run pytest tests/test_integration_v240.py -q
    Detect all similar and duplicate photos in my library
    ```
 
+8. **People & Face Triage** (`list_people_with_counts`, `get_person_photos`, `rename_person`, `delete_person`, `bulk_delete_people`, `cleanup_single_photo_faces`, `detect_people`, `tag_person`, `search_by_person`)
+   - List every face cluster enriched with photo counts, sorted by count/name/date
+   - Name/rename a person, delete one cluster - or bulk-delete hundreds of crowd-photo faces at once (photos stay, faces unassigned)
+   - One-shot crowd cleanup: preview then delete all faces with <=1 photo
+
+   Example:
+```bash
+Delete all faces with only one photo - they're crowd shots, not real people
+Show me all detected people sorted by photo count
+```
+
 ###  Library Management (External Folders Solution)
 
 ImmichMCP solves the "unwieldy external folder management" problem with comprehensive library management tools:
@@ -736,3 +747,7 @@ To start the webapp:
 3. Open `http://localhost:10838` in your browser.
 
 **Photos page**: timeline grouped by real photo month (year separators, sticky month headers, month rail with scroll-spy + click-to-jump), infinite scroll, and filters (media type, favorites, include archived, date range). Click any thumbnail for the photo viewer: zoom (wheel zoom-to-cursor, buttons, drag-to-pan, double-click, keyboard `+`/`-`/`0`), fullscreen, and a metadata panel (EXIF, camera/lens, dates, dimensions, GPS → maps link, status, smart info, people, albums). Search uses Immich CLIP smart search.
+
+**People page**: every face cluster with photo counts, sortable (most/fewest photos, name A-Z/Z-A, recently/oldest updated) and filterable (All/Named/Unnamed/<=1 photo/Hidden), 20 per page with an "N of M" readout. Fast multi-select via checkboxes (select page/all/<=1-photo in one click) plus a sticky bulk-delete bar and a one-click crowd cleanup (preview then delete all <=1-photo faces - photos stay in the library).
+
+**Sidebar & API Docs**: SOTA sidebar (collapse toggle at the top, version badge, backend status dot) and an API Docs page (Swagger UI + ReDoc of the FastAPI backend).

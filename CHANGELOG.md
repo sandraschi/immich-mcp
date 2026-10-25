@@ -2,6 +2,32 @@
 
 ## [Unreleased] - 2026-10-24
 
+### Added - People triage: sortable/filterable page, multi-select bulk delete, single-photo cleanup
+- People page rewritten to the list-page standard: search, filter
+  (All/Named/Unnamed/<=1 photo/Hidden), sort (photo count, name A-Z/Z-A,
+  recently/oldest updated), 20-per-page pagination with page numbers,
+  "N of M" count, grid/list toggle persisted to localStorage.
+- Fast multi-select: per-card checkboxes (no navigation on toggle),
+  select-page / select-all-filtered / select-<=1-photo one-click actions,
+  sticky bulk bar with two-step confirm delete (photos stay, faces unassigned).
+- Crowd-photo cleanup assist: preview + delete faces with <=1 photo in one go
+  (threshold + dry-run, candidate count shown before confirm).
+- Backend: `GET /api/v1/people?with_counts&sort&order&include_hidden&search`
+  (bounded concurrent per-person counts; exact for low counts),
+  `POST /api/v1/people/bulk-delete`, `POST /api/v1/people/cleanup`;
+  fixed `GET /api/v1/people/search` being shadowed by `/people/{person_id}`
+  (static routes now declared first).
+- MCP tools: `list_people_with_counts`, `bulk_delete_people` (confirm-gated),
+  `cleanup_single_photo_faces` (dry-run default). Client:
+  `get_all_people_with_counts`, `bulk_delete_people`, `cleanup_low_photo_people`.
+- Sidebar now SOTA-conforming: collapse toggle at the TOP (was bottom),
+  logo + backend version, connection status indicator, ordered nav with
+  unique icons per entry, testids; new API Docs page (`/api-docs`, Swagger +
+  ReDoc iframe + quick-ref strip) with vite proxy for /docs/openapi.json/redoc.
+- Tests: 10 new in `tests/test_people_cleanup.py` (counts enrichment, bulk
+  per-id errors, dry-run vs real cleanup, server sort/filter/confirm gates).
+  Full suite: 100 passed.
+
 ### Added - album detail + CUD (page click-through, create/rename/delete)
 - Clicking an album now opens `/albums/:id` with photos grid (thumbnails),
   inline rename, description edit, delete (two-click confirm, photos kept),
