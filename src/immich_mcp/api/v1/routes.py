@@ -176,6 +176,68 @@ async def set_active_user(request: UserSwitchRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+class PeopleBulkDeleteRequest(BaseModel):
+    ids: list[str]
+    confirm: bool = False
+
+
+class PeopleCleanupRequest(BaseModel):
+    threshold: int = 1
+    dry_run: bool = True
+    limit: int = 500
+
+
+@router.get("/people/search")
+async def search_by_person_route(
+    person_name: str,
+    limit: int = 50,
+    *,
+    include_metadata: bool = True,
+):
+    """Find all photos containing a specific person (static route: declared
+    before /people/{person_id} so 'search' is not mistaken for an id)."""
+    try:
+        from ...server import search_by_person as search_tool
+
+        return await search_tool(person_name, limit, include_metadata=include_metadata)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/people/bulk-delete")
+async def bulk_delete_people(request: PeopleBulkDeleteRequest):
+    """Delete many person clusters at once (photos stay, faces unassigned)."""
+    try:
+        from ...server import bulk_delete_people as bulk_tool
+
+        result = await bulk_tool(request.ids, confirm=request.confirm)
+        if result.get("deleted_count", 0) == 0 and result.get("errors"):
+            raise HTTPException(status_code=400, detail="; ".join(result["errors"][:3]))
+        return result
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/people/cleanup")
+async def cleanup_people(request: PeopleCleanupRequest):
+    """Find (and optionally delete) faces with few photos (crowd cleanup).
+
+    dry_run=True (default) only reports candidates; dry_run=False deletes.
+    """
+    try:
+        from ...server import cleanup_single_photo_faces as cleanup_tool
+
+        return await cleanup_tool(threshold=request.threshold, dry_run=request.dry_run, limit=request.limit)
+    except ImmichAPIError as e:
+        raise _immich_error_to_http(e) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.get("/people/{person_id}/thumbnail")
 async def get_person_thumbnail(person_id: str):
     """Proxy for person thumbnails."""
@@ -291,8 +353,20 @@ async def get_photo_file(asset_id: str):
 
 
 @router.get("/people")
-async def get_people():
-    """Get list of detected people."""
+async def get_people(
+    *,
+    with_counts: bool = False,
+    sort: str = "asset_count",
+    order: str = "desc",
+    include_hidden: bool = True,
+    search: str | None = None,
+):
+    """Get list of detected people.
+
+    with_counts=true enriches every person with asset_count/has_more_photos
+    (bounded concurrent sample — exact for low counts) and applies the
+    sort/order server-side so the People page can sort by photo count.
+    """
     try:
         from ...server import mcp
 
@@ -304,8 +378,16 @@ async def get_people():
                     "and restart the backend."
                 ),
             )
-        people = await mcp.immich_client.get_all_people()
-        return people
+        if not with_counts:
+            return await mcp.immich_client.get_all_people()
+        from ...server import list_people_with_counts as list_tool
+
+        return await list_tool(
+            sort_by=sort,
+            order=order,
+            include_hidden=include_hidden,
+            name_filter=search,
+        )
     except ImmichAPIError as e:
         raise _immich_error_to_http(e) from e
     except (httpx.ConnectError, httpx.TimeoutException) as e:
@@ -725,21 +807,8 @@ async def tag_person(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get("/people/search")
-async def search_by_person(
-    person_name: str,
-    limit: int = 50,
-    *,
-    include_metadata: bool = True,
-    client: ImmichAPIClient = Depends(get_api_client),
-):
-    """Find all photos containing a specific person."""
-    try:
-        from ...server import search_by_person as search_tool
-
-        return await search_tool(person_name, limit, include_metadata=include_metadata)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+# NOTE: GET /people/search lives above /people/{person_id} (route order
+# matters — the dynamic id route would otherwise swallow "search").
 
 
 # ===== SYSTEM & ADMINISTRATION ENDPOINTS =====

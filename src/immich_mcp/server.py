@@ -2125,6 +2125,155 @@ async def get_person_photos(person_id: str, size: int = 100) -> dict:
 
 
 @mcp.tool()
+async def list_people_with_counts(
+    *,
+    sort_by: str = "asset_count",
+    order: str = "desc",
+    include_hidden: bool = False,
+    name_filter: str | None = None,
+) -> list[dict]:
+    r"""List all people enriched with photo counts, sorted for triage.
+
+    Backs the People page sort/filter UI. Counts come from a small bounded
+    per-person sample (exact up to 10 photos, lower-bound above) — exact for
+    spotting single-photo crowd faces, approximate for prolific subjects.
+
+    Parameters:
+        sort_by (str, OPTIONAL): "asset_count" (default), "name", or "updatedAt".
+        order (str, OPTIONAL): "desc" (default) or "asc".
+        include_hidden (bool, OPTIONAL): Include hidden people. Default False.
+        name_filter (str, OPTIONAL): Case-insensitive substring on the name.
+
+    Returns:
+        List of {id, name, birthDate, isHidden, thumbnailPath, updatedAt,
+        asset_count, has_more_photos}, sorted. Missing values sort last.
+    """
+    try:
+        client = await get_api_client()
+
+        people = await client.get_all_people_with_counts()
+        if not include_hidden:
+            people = [p for p in people if not p.get("isHidden")]
+        if name_filter:
+            needle = name_filter.lower()
+            people = [p for p in people if needle in (p.get("name") or "").lower()]
+        reverse = order.lower() != "asc"
+        if sort_by == "name":
+            people.sort(
+                key=lambda p: ((p.get("name") or "").lower(), p.get("id", "")),
+                reverse=reverse,
+            )
+        elif sort_by == "updatedAt":
+            people.sort(
+                key=lambda p: (p.get("updatedAt") or "", p.get("id", "")),
+                reverse=reverse,
+            )
+        else:  # asset_count
+            people.sort(
+                key=lambda p: (p.get("asset_count", 0), p.get("name") or ""),
+                reverse=reverse,
+            )
+        return people
+
+    except ImmichAPIError as e:
+        logger.error("Immich API error in list_people_with_counts: %s", e)
+        return []
+
+
+@mcp.tool()
+async def bulk_delete_people(person_ids: list[str], *, confirm: bool = False) -> dict:
+    r"""Delete many person clusters at once (photos stay, faces unassigned).
+
+    For fast multi-select cleanup of crowd-photo faces on the People page.
+    One bad id does not abort the rest — per-id errors are reported.
+
+    Parameters:
+        person_ids (List[str], REQUIRED): Person IDs to delete (max 500/call).
+        confirm (bool, REQUIRED): Must be True — deletes cannot be undone.
+
+    Returns:
+        Dict {requested, deleted_count, error_count, deleted_ids, errors}.
+    """
+    if not confirm:
+        return {
+            "requested": len(person_ids or []),
+            "deleted_count": 0,
+            "error_count": 0,
+            "deleted_ids": [],
+            "errors": ["Refused: pass confirm=True to delete (cannot be undone)."],
+        }
+    if not person_ids:
+        return {
+            "requested": 0,
+            "deleted_count": 0,
+            "error_count": 0,
+            "deleted_ids": [],
+            "errors": ["person_ids must not be empty"],
+        }
+    if len(person_ids) > 500:
+        return {
+            "requested": len(person_ids),
+            "deleted_count": 0,
+            "error_count": 1,
+            "deleted_ids": [],
+            "errors": ["person_ids exceeds 500 per call — page it"],
+        }
+    try:
+        client = await get_api_client()
+
+        return await client.bulk_delete_people(person_ids)
+
+    except ImmichAPIError as e:
+        logger.error("Immich API error in bulk_delete_people: %s", e)
+        return {
+            "requested": len(person_ids),
+            "deleted_count": 0,
+            "error_count": 1,
+            "deleted_ids": [],
+            "errors": [str(e)],
+        }
+
+
+@mcp.tool()
+async def cleanup_single_photo_faces(*, threshold: int = 1, dry_run: bool = True, limit: int = 500) -> dict:
+    r"""Delete faces with only a few associated photos (crowd-photo cleanup).
+
+    Finds every person with asset_count <= threshold (default 1: faces with
+    zero or one photo — overwhelmingly crowd-photo crap, not real people).
+    With dry_run=True (default) only reports candidates; pass dry_run=False
+    to actually delete them. Photos stay in the library, faces unassigned.
+
+    Parameters:
+        threshold (int, OPTIONAL): Max photos to qualify (0-10, default 1).
+        dry_run (bool, OPTIONAL): Preview only when True (default). False deletes.
+        limit (int, OPTIONAL): Max candidates processed (1-500, default 500).
+
+    Returns:
+        Dict {threshold, dry_run, candidate_count, candidates: [{id, name,
+        asset_count}], deleted_count, deleted_ids?, errors}.
+    """
+    try:
+        client = await get_api_client()
+
+        return await client.cleanup_low_photo_people(
+            threshold=max(0, min(threshold, 10)),
+            dry_run=dry_run,
+            limit=max(1, min(limit, 500)),
+        )
+
+    except ImmichAPIError as e:
+        logger.error("Immich API error in cleanup_single_photo_faces: %s", e)
+        return {
+            "threshold": threshold,
+            "dry_run": dry_run,
+            "candidate_count": 0,
+            "candidates": [],
+            "deleted_count": 0,
+            "errors": [str(e)],
+        }
+
+
+@mcp.tool()
 async def list_albums(*, shared: bool | None = None, include_stats: bool = True) -> list[AlbumInfo]:
     r"""List all albums with metadata and statistics.
 

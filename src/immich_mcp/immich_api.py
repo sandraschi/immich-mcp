@@ -1079,6 +1079,114 @@ class ImmichAPIClient:
         result = await self._get("/people")
         return result.get("people", []) if isinstance(result, dict) else result
 
+    async def get_all_people_with_counts(self, *, count_sample_size: int = 10, max_concurrency: int = 8) -> list[dict]:
+        """Get all people enriched with per-person photo counts.
+
+        Immich's GET /people returns no asset counts, and /search/metadata's
+        ``total`` is the page count (not the library total), so counts are
+        derived from ``len(items)`` with a small sample size per person.
+        ``asset_count`` is exact when ``has_more_photos`` is False and a
+        lower bound (``count_sample_size``+) otherwise — exact for the
+        crap-face cleanup use case (thresholds well below the sample size).
+
+        Runs the per-person searches concurrently (bounded semaphore) so a
+        library with hundreds of crowd-photo faces still loads in seconds.
+        """
+        import asyncio
+
+        people = await self.get_all_people()
+        sample = max(2, min(count_sample_size, 50))
+        sem = asyncio.Semaphore(max(1, max_concurrency))
+
+        async def _count(person: dict) -> dict:
+            pid = person.get("id", "")
+            enriched = {
+                "id": pid,
+                "name": person.get("name", ""),
+                "birthDate": person.get("birthDate"),
+                "isHidden": person.get("isHidden", False),
+                "thumbnailPath": person.get("thumbnailPath"),
+                "updatedAt": person.get("updatedAt", ""),
+                "asset_count": 0,
+                "has_more_photos": False,
+            }
+            if not pid:
+                return enriched
+            try:
+                async with sem:
+                    items, _ = await self.search_metadata(size=sample, person_ids=[pid])
+            except Exception as e:
+                logger.warning("Photo count lookup failed for person %s: %s", pid, e)
+                enriched["count_error"] = str(e)
+                return enriched
+            enriched["asset_count"] = len(items)
+            enriched["has_more_photos"] = len(items) == sample
+            return enriched
+
+        return list(await asyncio.gather(*(_count(p) for p in people)))
+
+    async def bulk_delete_people(self, person_ids: list[str], *, max_concurrency: int = 8) -> dict:
+        """Delete many person clusters at once (photos stay, faces unassigned).
+
+        Returns {deleted_ids, error_count, errors}. Each delete is
+        independent — one bad id does not abort the rest.
+        """
+        import asyncio
+
+        ids = [pid.strip() for pid in (person_ids or []) if pid and pid.strip()]
+        if not ids:
+            raise ImmichAPIError("person_ids must not be empty")
+        sem = asyncio.Semaphore(max(1, max_concurrency))
+        deleted: list[str] = []
+        errors: list[str] = []
+
+        async def _one(pid: str) -> None:
+            try:
+                async with sem:
+                    await self.delete_person(pid)
+                deleted.append(pid)
+            except Exception as e:
+                errors.append(f"{pid}: {e!s}")
+
+        await asyncio.gather(*(_one(pid) for pid in ids))
+        return {
+            "requested": len(ids),
+            "deleted_count": len(deleted),
+            "error_count": len(errors),
+            "deleted_ids": deleted,
+            "errors": errors,
+        }
+
+    async def cleanup_low_photo_people(self, *, threshold: int = 1, dry_run: bool = True, limit: int = 500) -> dict:
+        """Find (and optionally delete) faces with few associated photos.
+
+        Crowd photos spawn hundreds of single-photo face clusters. With the
+        default threshold=1 this reports every person with 0-1 photos; pass
+        dry_run=False to actually delete them. Deletion reuses
+        bulk_delete_people (photos stay in the library, faces unassigned).
+        """
+        threshold = max(0, threshold)
+        enriched = await self.get_all_people_with_counts(count_sample_size=threshold + 2)
+        candidates = [p for p in enriched if p.get("asset_count", 0) <= threshold]
+        candidates.sort(key=lambda p: (p.get("asset_count", 0), p.get("name") or ""))
+        candidates = candidates[: max(1, limit)]
+        result: dict = {
+            "threshold": threshold,
+            "dry_run": dry_run,
+            "candidate_count": len(candidates),
+            "candidates": [
+                {"id": p["id"], "name": p.get("name", ""), "asset_count": p.get("asset_count", 0)} for p in candidates
+            ],
+            "deleted_count": 0,
+            "errors": [],
+        }
+        if not dry_run and candidates:
+            bulk = await self.bulk_delete_people([p["id"] for p in candidates])
+            result["deleted_count"] = bulk.get("deleted_count", 0)
+            result["errors"] = bulk.get("errors", [])
+            result["deleted_ids"] = bulk.get("deleted_ids", [])
+        return result
+
     async def close(self):
         """Close the HTTP client"""
         await self.client.aclose()
