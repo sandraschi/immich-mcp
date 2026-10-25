@@ -1,6 +1,6 @@
 # Unified Monitoring Stack for All MCP Repositories
 
-**Date:** October 23, 2025  
+**Date:** October 23, 2025
 **Purpose:** Single monitoring stack serving all MCP repositories and applications
 
 ---
@@ -64,9 +64,9 @@ Create a **single, centralized monitoring stack** that serves:
 
 #### **MyAI Platform**
 - ✅ **Grafana**: Port 3140
-- ✅ **Loki**: Port 3100  
+- ✅ **Loki**: Port 3100
 - ✅ **Promtail**: Running
-- ✅ **Docker Network**: `mywienerlinien_loki-network`
+- ✅ **Docker Network**: `publictransport-mcp_loki-network`
 - ✅ **Applications**: 5+ applications with logging integration
 
 #### **VeoGen Platform**
@@ -201,11 +201,11 @@ scrape_configs:
   - job_name: 'tailscale-mcp'
     static_configs:
       - targets: ['tailscale-mcp:9091']
-  
+
   - job_name: 'virtualization-mcp'
     static_configs:
       - targets: ['virtualization-mcp:9091']
-  
+
   - job_name: 'database-operations-mcp'
     static_configs:
       - targets: ['database-operations-mcp:9091']
@@ -214,7 +214,7 @@ scrape_configs:
   - job_name: 'myai-dashboard'
     static_configs:
       - targets: ['myai-dashboard:8000']
-  
+
   - job_name: 'myai-calibre-plus'
     static_configs:
       - targets: ['myai-calibre-plus:8000']
@@ -223,7 +223,7 @@ scrape_configs:
   - job_name: 'veogen-backend'
     static_configs:
       - targets: ['veogen-backend:8000']
-  
+
   - job_name: 'veogen-frontend'
     static_configs:
       - targets: ['veogen-frontend:3000']
@@ -232,7 +232,7 @@ scrape_configs:
   - job_name: 'node-exporter'
     static_configs:
       - targets: ['node-exporter:9100']
-  
+
   - job_name: 'cadvisor'
     static_configs:
       - targets: ['cadvisor:8080']
@@ -495,8 +495,7 @@ scrape_configs:
 
 ---
 
-**Status**: 📋 Planning Phase  
-**Priority**: 🔥 High  
-**Estimated Effort**: 2-3 weeks  
+**Status**: 📋 Planning Phase
+**Priority**: 🔥 High
+**Estimated Effort**: 2-3 weeks
 **Expected Benefits**: Significant cost savings, improved monitoring, unified experience
-

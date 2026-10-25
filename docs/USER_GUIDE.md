@@ -56,6 +56,12 @@ OCR search automatically extracts text from images and makes it searchable. This
 - Searching for photos with specific dates or numbers
 - Locating images containing specific text content
 
+### People & Face Recognition
+- "Show me all detected people sorted by photo count"
+- "Delete all faces with only one photo - they're crowd shots, not real people"
+- "Find all photos with Marion in them"
+- "Tag person ID per123 as Sandra"
+
 ## 🖼️ Photo Viewing (Experimental)
 
 While Claude's interface doesn't natively support image viewing, here are some workarounds:
@@ -89,6 +95,13 @@ Then open `http://localhost:8000` in your browser.
 2. Archive or delete unwanted photos
 3. Update metadata and tags
 4. Organize into albums
+
+### Cleaning Up Face Clusters (Webapp People Page)
+1. Open the People page - the list paints fast, photo counts follow automatically
+2. Sort by Fewest photos or pick the "<=1 photo" filter to surface crowd-photo faces
+3. Use "Select <=1-photo faces" (or tick boxes by hand), then Delete selected (two-step confirm)
+4. Or use the crowd-cleanup assist: Preview single-photo faces, then delete them in one go
+5. Photos stay in the library - only the face assignments are removed
 
 ## 🛠️ Troubleshooting
 

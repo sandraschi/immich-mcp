@@ -246,18 +246,63 @@ Find all photos containing a specific person.
 Find all photos with Marion in them
 ```
 
-#### `list_people`
+#### `list_people_with_counts`
 
-Browse all detected people with photo counts.
+Browse all detected people enriched with photo counts, sorted for triage.
+Backs the People page sort/filter UI.
 
 **Parameters:**
 
-- `limit` (int, default=100): Maximum people to return
+- `sort_by` (str, default="asset_count"): "asset_count", "name", or "updatedAt"
+- `order` (str, default="desc"): "desc" or "asc"
+- `include_hidden` (bool, default=False): Include hidden people
+- `name_filter` (Optional[str]): Case-insensitive substring on the name
 
 **Example:**
 
 ```
 Show me all detected people in my photo library
+```
+
+#### `get_person_photos`
+
+List photos showing one person (via the official personIds search filter).
+
+**Parameters:**
+
+- `person_id` (str): Person ID
+- `size` (int, default=100): Max photos (1-1000)
+
+#### `rename_person` / `delete_person`
+
+Name (or clear the name of) a single person cluster; delete one cluster
+(photos stay, faces become unassigned). Deletion cannot be undone.
+
+#### `bulk_delete_people`
+
+Delete many person clusters at once (photos stay, faces unassigned).
+One bad id does not abort the rest.
+
+**Parameters:**
+
+- `person_ids` (List[str]): Person IDs to delete (max 500/call)
+- `confirm` (bool, REQUIRED): Must be True — deletes cannot be undone
+
+#### `cleanup_single_photo_faces`
+
+Delete faces with only a few associated photos (crowd-photo cleanup).
+With `dry_run=True` (default) only reports candidates.
+
+**Parameters:**
+
+- `threshold` (int, default=1): Max photos to qualify (0-10)
+- `dry_run` (bool, default=True): Preview only when True
+- `limit` (int, default=500): Max candidates processed
+
+**Example:**
+
+```
+Delete all faces with only one photo — they're crowd shots, not real people
 ```
 
 ### 🔧 Administration & Monitoring
@@ -314,7 +359,7 @@ Check if Immich server is responding properly
 All tools include comprehensive error handling with Austrian efficiency principles:
 
 - **Direct communication**: Clear, actionable error messages
-- **No gaslighting**: Honest about failures and limitations  
+- **No gaslighting**: Honest about failures and limitations
 - **Detailed context**: Specific information about what went wrong
 - **Recovery suggestions**: Practical next steps when possible
 
